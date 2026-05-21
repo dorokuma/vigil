@@ -9,7 +9,7 @@ import {
 } from '@tanstack/react-table';
 import { useState } from 'react';
 
-import type { EnrichedServer } from '../types'; // we'll add types later if needed
+import type { EnrichedServer } from '../types';
 
 interface ServersTableProps {
   data: EnrichedServer[];
@@ -92,6 +92,31 @@ export function ServersTable({ data, isLoading }: ServersTableProps) {
     getFilteredRowModel: getFilteredRowModel(),
   });
 
+  const exportToCSV = () => {
+    const headers = ['服务器', '状态', 'CPU%', '内存%', '延迟(ms)', '运行时间'];
+    const rows = data.map(s => [
+      s.name,
+      s.online ? '在线' : '离线',
+      s.cpu,
+      s.memory,
+      s.latency,
+      s.uptime
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = `vigil-servers-${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (isLoading) {
     return <div className="p-8 text-center text-zinc-500">加载中...</div>;
   }
@@ -106,8 +131,16 @@ export function ServersTable({ data, isLoading }: ServersTableProps) {
           onChange={e => setGlobalFilter(e.target.value)}
           className="px-4 py-2 border rounded-lg bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 w-72 text-sm"
         />
-        <div className="text-xs text-zinc-500">
-          {table.getFilteredRowModel().rows.length} 台服务器
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-zinc-500">
+            {table.getFilteredRowModel().rows.length} 台服务器
+          </div>
+          <button
+            onClick={exportToCSV}
+            className="px-4 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 rounded-lg flex items-center gap-1.5 transition-colors"
+          >
+            📥 导出 CSV
+          </button>
         </div>
       </div>
 
