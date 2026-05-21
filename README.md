@@ -1,19 +1,44 @@
-# Vigil 🔭
+<div align="center">
+  <h1>🔭 Vigil</h1>
+  <p><em>Lightweight server monitoring agent with active push mode</em></p>
+  <p>
+    <a href="#features">Features</a> •
+    <a href="#architecture">Architecture</a> •
+    <a href="#quick-start">Quick Start</a> •
+    <a href="#metrics">Metrics</a> •
+    <a href="#license">License</a>
+  </p>
+  <p>
+    <a href="README.zh.md">🇨🇳 中文</a>
+  </p>
+</div>
 
-Lightweight server monitoring agent with active push mode.
+---
 
-Instead of traditional centralized polling (ping/SNMP), **Vigil runs a tiny Go agent on each server** that reads `/proc/` metrics and pushes them via HTTP to a central collector.
+**Vigil** is a lightweight server monitoring system that runs a tiny Go agent on each server. Instead of traditional centralized polling (ping/SNMP), each agent actively reads `/proc/` metrics and pushes them via HTTP to a central collector.
+
+## Features
+
+- **Single binary agent** — Go compiled, ~5MB RAM, zero dependencies, one `scp` to deploy
+- **Dual architecture** — Pre-built for `linux/amd64` and `linux/arm64`
+- **Active push mode** — No open inbound ports needed on monitored servers
+- **Systemd managed** — Auto-restart on crash, logs via journalctl
+- **Minimal collector** — Python 3 HTTP server, SQLite storage, no external database
+- **Threshold alerts** — CPU/memory/disk alerts via Telegram (or any channel)
+- **GitHub Actions CI** — Auto-build on tag push, ready-to-use binaries in Releases
 
 ## Architecture
 
 ```
-Every server -> Agent (Go binary) -> HTTP POST /report -> Collector -> SQLite -> Alert Engine -> Telegram
+Every server --> Agent (Go) --> HTTP POST /report --> Collector (Python) --> SQLite --> Alerts --> Telegram
 ```
 
-- **Agent**: Single Go binary, ~5MB RAM, zero dependencies
-- **Collector**: Python 3 HTTP server (receiver.py + storage.py + alerts.py)
-- **Storage**: SQLite, no external database required
-- **Alerting**: Threshold-based CPU/Memory/Disk alerts
+| Component | Language | Role |
+|-----------|----------|------|
+| **Agent** | Go | Runs on each server, collects `/proc/*` metrics, pushes to collector |
+| **Collector** | Python 3 | Receives reports via HTTP, stores in SQLite, evaluates alert rules |
+| **Storage** | SQLite | Embedded, zero-config, keeps 7-day history per server |
+| **Alert Engine** | Python | Threshold-based CPU/Memory/Disk/Offline alerts with cooldown |
 
 ## Quick Start
 
@@ -23,16 +48,16 @@ Every server -> Agent (Go binary) -> HTTP POST /report -> Collector -> SQLite ->
 cd agent
 go mod tidy
 
-# Build for AMD64
+# AMD64 (most cloud VPS)
 GOOS=linux GOARCH=amd64 go build -o vigil-agent-linux-amd64 ./...
 
-# Build for ARM64
+# ARM64 (Oracle ARM, Apple Silicon servers)
 GOOS=linux GOARCH=arm64 go build -o vigil-agent-linux-arm64 ./...
 ```
 
-### 2. Configure
+### 2. Configure the Agent
 
-Create `/etc/vigil/config.json` on the target server:
+On each target server, create `/etc/vigil/config.json`:
 
 ```json
 {
@@ -42,19 +67,20 @@ Create `/etc/vigil/config.json` on the target server:
 }
 ```
 
-### 3. Install as a systemd service
+Or leave `hostname` empty to auto-detect from OS.
+
+### 3. Install as a systemd Service
 
 ```bash
 cp vigil-agent-linux-* /usr/local/bin/vigil-agent
 chmod +x /usr/local/bin/vigil-agent
 mkdir -p /etc/vigil
-# write config.json as above
 cp deploy/vigil-agent.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now vigil-agent
 ```
 
-Or use the install script:
+Or use the one-liner install script:
 
 ```bash
 bash deploy/install.sh amd64 my-server-01 http://your-collector:9901
@@ -62,7 +88,7 @@ bash deploy/install.sh amd64 my-server-01 http://your-collector:9901
 
 ### 4. Set up the Collector
 
-See `bot-ext/` for the Python receiver components. Integrate into your bot:
+Integrate the collector components into your Python bot:
 
 ```python
 from receiver import start_vigil_server
@@ -70,25 +96,36 @@ from storage import VigilStorage
 from alerts import VigilAlertEngine
 
 storage = VigilStorage("/path/to/vigil.db")
-engine = VigilAlertEngine({"cpu_threshold": 80, "memory_threshold": 90})
+engine = VigilAlertEngine({
+    "cpu_threshold": 80,
+    "memory_threshold": 90,
+    "disk_threshold": 85,
+    "offline_sec": 180,
+    "cooldown": 300,
+})
 
 def alert_callback(alert):
-    print(f"ALERT: {alert['message']}")
+    print(f"ALERT: {alert['hostname']} - {alert['message']}")
 
 start_vigil_server("0.0.0.0", 9901, storage, engine, alert_callback)
 ```
 
-## Collected Metrics
+See `bot-ext/` for the full source.
+
+## Metrics
+
+All metrics are read from `/proc/` — no external commands, no sudo, no dependencies.
 
 | Metric | Source | Unit |
 |--------|--------|------|
-| CPU usage | `/proc/stat` delta | % |
+| CPU usage | `/proc/stat` (delta) | % |
 | System load | `/proc/loadavg` | 1/5/15 min |
 | Memory | `/proc/meminfo` (MemAvailable) | MB, % |
-| Disk | `statfs()` syscall | GB, % |
-| Network traffic | `/proc/net/dev` delta | bytes, bps |
+| Disk usage | `statfs()` syscall | GB, % |
+| Network traffic | `/proc/net/dev` (delta) | bytes, bps |
 | Uptime | `/proc/uptime` | seconds |
-| Process count | `/proc/[0-9]*` count | integer |
+| Process count | `/proc/[0-9]*` | integer |
+| Kernel version | `/proc/version` | string |
 
 ## Agent Report Format
 
@@ -97,18 +134,44 @@ start_vigil_server("0.0.0.0", 9901, storage, engine, alert_callback)
     "hostname": "server-01",
     "type": "heartbeat",
     "data": {
-        "cpu": { "percent": 45.2, "load_1": 2.1, "load_5": 1.8, "load_15": 1.5 },
-        "memory": { "total_mb": 16000, "used_mb": 8000, "avail_mb": 8000, "percent": 50.0 },
-        "disks": [{ "mount_point": "/", "total_gb": 100, "used_gb": 60, "free_gb": 40, "percent": 60.0 }],
-        "network": [{ "interface": "eth0", "rx_bytes": 123456789, "tx_bytes": 98765432, "rx_speed_bps": 1000000, "tx_speed_bps": 500000 }],
-        "system": { "hostname": "server-01", "uptime_sec": 3600, "process_cnt": 200, "kernel_version": "Linux ...", "timestamp": 1700000000 }
+        "cpu": {
+            "percent": 45.2,
+            "load_1": 2.1,
+            "load_5": 1.8,
+            "load_15": 1.5
+        },
+        "memory": {
+            "total_mb": 16000,
+            "used_mb": 8000,
+            "avail_mb": 8000,
+            "percent": 50.0
+        },
+        "disks": [{
+            "mount_point": "/",
+            "total_gb": 100,
+            "used_gb": 60,
+            "free_gb": 40,
+            "percent": 60.0
+        }],
+        "network": [{
+            "interface": "eth0",
+            "rx_bytes": 123456789,
+            "tx_bytes": 98765432,
+            "rx_speed_bps": 1000000,
+            "tx_speed_bps": 500000
+        }],
+        "system": {
+            "hostname": "server-01",
+            "uptime_sec": 3600,
+            "process_cnt": 200,
+            "kernel_version": "Linux version 6.12.74+deb13+1-arm64 ...",
+            "timestamp": 1700000000
+        }
     }
 }
 ```
 
-## Telegram Alerts
-
-Example alert callback for Telegram:
+## Telegram Alert Integration
 
 ```python
 async def push_alert(alert):
@@ -116,6 +179,10 @@ async def push_alert(alert):
     text = f"{icon} {alert['hostname']}\n{alert['message']}"
     await application.bot.send_message(chat_id=YOUR_CHAT_ID, text=text)
 ```
+
+## Why Vigil?
+
+**Instead of LLM-Wiki / traditional RAG** — this is a real monitoring system for real servers. No "incremental knowledge compilation," no "graph-based retrieval." Just a Go binary that reads `/proc/` and pushes JSON.
 
 ## License
 
