@@ -5,6 +5,7 @@
     <a href="#features">Features</a> •
     <a href="#architecture">Architecture</a> •
     <a href="#quick-start">Quick Start</a> •
+    <a href="#security">Security & HTTPS</a> •
     <a href="#metrics">Metrics</a> •
     <a href="#license">License</a>
   </p>
@@ -15,7 +16,7 @@
 
 ---
 
-**Vigil** is a lightweight server monitoring system that runs a tiny Go agent on each server. Instead of traditional centralized polling (ping/SNMP), each agent actively reads `/proc/` metrics and pushes them via HTTP to a central collector.
+**Vigil** is a lightweight server monitoring system that runs a tiny Go agent on each server. Instead of traditional centralized polling (ping/SNMP), each agent actively reads `/proc/` metrics and pushes them via HTTP/HTTPS to a central collector.
 
 ## Features
 
@@ -23,20 +24,22 @@
 - **Dual architecture** — Pre-built for `linux/amd64` and `linux/arm64`
 - **Active push mode** — No open inbound ports needed on monitored servers
 - **Systemd managed** — Auto-restart on crash, logs via journalctl
-- **Minimal collector** — Python 3 HTTP server, SQLite storage, no external database
-- **Threshold alerts** — CPU/memory/disk alerts via Telegram (or any channel)
+- **Minimal collector** — Python 3 HTTP/HTTPS server, SQLite storage, no external database
+- **Token authentication** — Optional shared secret for secure /report endpoint
+- **HTTPS support** — Native TLS (just pass certfile/keyfile)
+- **Threshold + Offline alerts** — CPU/memory/disk + automatic offline detection via background checker
 - **GitHub Actions CI** — Auto-build on tag push, ready-to-use binaries in Releases
 
 ## Architecture
 
 ```
-Every server --> Agent (Go) --> HTTP POST /report --> Collector (Python) --> SQLite --> Alerts --> Telegram
+Every server --> Agent (Go) --> HTTP/HTTPS POST /report --> Collector (Python) --> SQLite --> Alerts --> Telegram
 ```
 
 | Component | Language | Role |
 |-----------|----------|------|
-| **Agent** | Go | Runs on each server, collects `/proc/*` metrics, pushes to collector |
-| **Collector** | Python 3 | Receives reports via HTTP, stores in SQLite, evaluates alert rules |
+| **Agent** | Go | Runs on each server, collects `/proc/*` metrics, pushes to collector (supports https://) |
+| **Collector** | Python 3 | Receives reports via HTTP/HTTPS, stores in SQLite, evaluates alert rules |
 | **Storage** | SQLite | Embedded, zero-config, keeps 7-day history per server |
 | **Alert Engine** | Python | Threshold-based CPU/Memory/Disk/Offline alerts with cooldown |
 
@@ -61,9 +64,10 @@ On each target server, create `/etc/vigil/config.json`:
 
 ```json
 {
-    "server_url": "http://your-collector:9901",
+    "server_url": "https://your-collector:9901",
     "interval": 30,
-    "hostname": "my-server-01"
+    "hostname": "my-server-01",
+    "token": "super-secret-123"   // optional but recommended
 }
 ```
 
@@ -83,7 +87,7 @@ systemctl enable --now vigil-agent
 Or use the one-liner install script:
 
 ```bash
-bash deploy/install.sh amd64 my-server-01 http://your-collector:9901
+bash deploy/install.sh amd64 my-server-01 https://your-collector:9901
 ```
 
 ### 4. Set up the Collector
@@ -91,7 +95,7 @@ bash deploy/install.sh amd64 my-server-01 http://your-collector:9901
 Integrate the collector components into your Python bot:
 
 ```python
-from receiver import start_vigil_server
+from receiver import start_vigil_server, start_offline_checker
 from storage import VigilStorage
 from alerts import VigilAlertEngine
 
@@ -107,10 +111,33 @@ engine = VigilAlertEngine({
 def alert_callback(alert):
     print(f"ALERT: {alert['hostname']} - {alert['message']}")
 
-start_vigil_server("0.0.0.0", 9901, storage, engine, alert_callback)
+# Start HTTPS + Token server
+start_vigil_server("0.0.0.0", 9901, storage, engine, alert_callback,
+                   token="super-secret-123",
+                   certfile="/path/to/fullchain.pem",
+                   keyfile="/path/to/privkey.pem")
+
+# Enable automatic offline alerts (runs in background thread)
+start_offline_checker(storage, engine, alert_callback, check_interval=60)
 ```
 
 See `bot-ext/` for the full source.
+
+## Security & HTTPS 🔒
+
+**Token Authentication** (strongly recommended)
+- Set the same `token` in agent config.json and collector
+- Collector rejects requests with wrong/missing token (returns 401)
+- Works over both HTTP and HTTPS
+
+**HTTPS Support**
+- Pass `certfile` and `keyfile` (PEM format) to `start_vigil_server`
+- Agent automatically uses TLS when `server_url` starts with `https://`
+- No code changes needed in Go agent
+
+**Offline Auto-Detection**
+- `start_offline_checker(...)` runs a daemon thread that checks `last_seen` every N seconds
+- Triggers **critical** alerts when an agent stops reporting
 
 ## Metrics
 
