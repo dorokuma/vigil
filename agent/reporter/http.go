@@ -13,13 +13,15 @@ import (
 type Reporter struct {
 	serverURL string
 	hostname  string
+	token     string
 	client    *http.Client
 }
 
-func New(serverURL, hostname string) *Reporter {
+func New(serverURL, hostname, token string) *Reporter {
 	return &Reporter{
 		serverURL: serverURL,
 		hostname:  hostname,
+		token:     token,
 		client:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
@@ -29,6 +31,9 @@ func (r *Reporter) Report(data collector.ReportData) error {
 		"hostname": r.hostname,
 		"data":     data,
 		"type":     "heartbeat",
+	}
+	if r.token != "" {
+		payload["token"] = r.token
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -51,6 +56,9 @@ func (r *Reporter) ReportOffline() error {
 		"hostname":  r.hostname,
 		"type":      "offline",
 		"timestamp": time.Now().Unix(),
+	}
+	if r.token != "" {
+		payload["token"] = r.token
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
