@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 
+import { useQuery } from '@tanstack/react-query';
+
 interface Alert {
   id: number;
   time: string;
@@ -7,33 +9,38 @@ interface Alert {
   type: string;
   severity: 'warning' | 'critical';
   message: string;
+  timestamp: number;
 }
 
 export default function Alerts() {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const { data: alerts = [], isLoading, refetch } = useQuery<Alert[]>({
+    queryKey: ['alerts'],
+    queryFn: async () => {
+      const res = await fetch('/api/alerts');
+      return res.json();
+    },
+    refetchInterval: 10000, // 每10秒自动刷新
+  });
 
-  useEffect(() => {
-    const saved = localStorage.getItem('vigil-alerts');
-    if (saved) setAlerts(JSON.parse(saved));
-  }, []);
-
-  const addDemoAlert = () => {
-    const newAlert: Alert = {
-      id: Date.now(),
-      time: new Date().toLocaleTimeString(),
+  const addDemoAlert = async () => {
+    const demo = {
       hostname: ['hongkong', 'tokyo', 'beijing'][Math.floor(Math.random() * 3)],
-      type: ['cpu_high', 'memory_high', 'offline'][Math.floor(Math.random() * 3)],
+      type: 'cpu_high',
       severity: Math.random() > 0.5 ? 'warning' : 'critical',
       message: '模拟告警 - ' + new Date().toLocaleTimeString(),
     };
-    const updated = [newAlert, ...alerts].slice(0, 50);
-    setAlerts(updated);
-    localStorage.setItem('vigil-alerts', JSON.stringify(updated));
+    await fetch('/api/alerts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(demo),
+    });
+    refetch();
   };
 
-  const clearHistory = () => {
-    setAlerts([]);
+  const clearHistory = async () => {
+    // 简单实现：清空本地（生产可加 DELETE 接口）
     localStorage.removeItem('vigil-alerts');
+    refetch();
   };
 
   return (
@@ -41,7 +48,7 @@ export default function Alerts() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold">告警历史</h2>
-          <p className="text-sm text-zinc-500 mt-1">最近 50 条告警记录（本地存储）</p>
+          <p className="text-sm text-zinc-500 mt-1">实时来自 Python Bot 的告警 · 每10秒刷新</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -59,7 +66,9 @@ export default function Alerts() {
         </div>
       </div>
 
-      {alerts.length === 0 ? (
+      {isLoading ? (
+        <div className="text-center py-16 text-zinc-500">加载中...</div>
+      ) : alerts.length === 0 ? (
         <div className="text-center py-16 text-zinc-500">
           暂无告警记录
         </div>
