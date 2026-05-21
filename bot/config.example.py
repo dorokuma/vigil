@@ -50,5 +50,9 @@ CONSECUTIVE_THRESHOLD = 3
 # ==== 离线检测 ====
 OFFLINE_CHECK_INTERVAL = 60  # 每 60 秒检查一次
 
+# ==== Cloudflare Dashboard 告警历史推送（可选）====
+# 设置后，真实告警会自动推送到网页版 "告警历史" 页面
+# CF_ALERT_URL = "https://your-dash.pages.dev/api/alerts"
+
 # ==== 日志 ====
 LOG_LEVEL = "INFO"
