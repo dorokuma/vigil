@@ -20,16 +20,18 @@ from storage import VigilStorage
 from alerts import VigilAlertEngine
 from pinger import Pinger
 
-# 尝试加载配置，如果没有 config.py 就用环境变量
+try:
+    import httpx  # 用于推送告警到 Cloudflare Dashboard
+except ImportError:
+    httpx = None
+
+# 尝试加载配置
 try:
     import config as cfg
 except ImportError:
     cfg = None
     print("WARNING: config.py not found. Using environment variables.")
-    print("  Copy config.example.py to config.py and fill in your settings.")
-    print()
 
-# 日志配置
 log_level = getattr(cfg, "LOG_LEVEL", os.environ.get("LOG_LEVEL", "INFO"))
 logging.basicConfig(
     level=getattr(logging, log_level.upper(), logging.INFO),
@@ -37,11 +39,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("vigil")
 
+# Cloudflare Dashboard 告警推送地址（可选）
+CF_ALERT_URL = getattr(cfg, "CF_ALERT_URL", os.environ.get("CF_ALERT_URL", ""))
+
 
 def main():
     logger.info("=== Vigil Monitor Bot starting ===")
 
-    # ---- 配置 ----
     db_path = getattr(cfg, "DB_PATH", os.environ.get("VIGIL_DB_PATH", "vigil.db"))
     vigil_host = getattr(cfg, "VIGIL_HOST", "0.0.0.0")
     vigil_port = getattr(cfg, "VIGIL_PORT", 9901)
@@ -55,10 +59,8 @@ def main():
 
     offline_check_interval = getattr(cfg, "OFFLINE_CHECK_INTERVAL", 60)
 
-    # ---- 存储 ----
     storage = VigilStorage(db_path)
 
-    # ---- 告警引擎 ----
     alert_config = {
         "cpu_threshold": getattr(cfg, "ALERT_CPU", 80.0),
         "memory_threshold": getattr(cfg, "ALERT_MEMORY", 90.0),
@@ -71,13 +73,19 @@ def main():
     }
     alert_engine = VigilAlertEngine(alert_config)
 
-    # ---- 告警回调（默认只打日志，用户可自定义） ----
+    # 告警回调（同时推送到 Telegram + Cloudflare Dashboard）
     def alert_callback(alert):
         icon = "\U0001f6a8" if alert["severity"] == "critical" else "\u26a0\ufe0f"
         msg = f"{icon} [{alert['type']}] {alert['hostname']}: {alert['message']}"
         logger.warning(msg)
 
-    # ---- 启动 HTTP 接收端（线程） ----
+        # 推送到 Cloudflare 前端告警历史（如果配置了 URL）
+        if CF_ALERT_URL and httpx:
+            try:
+                httpx.post(CF_ALERT_URL, json=alert, timeout=3)
+            except Exception as e:
+                logger.debug(f"推送 CF Dashboard 失败: {e}")
+
     http_thread = threading.Thread(
         target=start_vigil_server,
         args=(vigil_host, vigil_port, storage, alert_engine, alert_callback),
@@ -87,7 +95,6 @@ def main():
     )
     http_thread.start()
 
-    # ---- 启动离线检查线程 ----
     start_offline_checker(storage, alert_engine, alert_callback, offline_check_interval)
 
     logger.info("Vigil Monitor Bot is running!")
@@ -99,9 +106,7 @@ def main():
         logger.info("  Pinger: %d hosts every %ds", len(ping_hosts), ping_interval)
     else:
         logger.info("  Pinger: disabled (no PING_HOSTS configured)")
-        logger.info("  -> Add hosts to config.py PING_HOSTS dict to enable")
 
-    # ---- 启动 Pinger（异步） ----
     async def run_pinger():
         pinger = Pinger(ping_hosts, ping_interval, ping_timeout, storage)
         await pinger.start()
@@ -114,7 +119,6 @@ def main():
             name="vigil-pinger",
         ).start()
 
-    # ---- 保持主线程运行 ----
     try:
         while True:
             import time
