@@ -1,5 +1,3 @@
-import { useState, useEffect } from 'react';
-
 import { useQuery } from '@tanstack/react-query';
 
 interface Alert {
@@ -17,9 +15,10 @@ export default function Alerts() {
     queryKey: ['alerts'],
     queryFn: async () => {
       const res = await fetch('/api/alerts');
+      if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     },
-    refetchInterval: 10000, // 每10秒自动刷新
+    refetchInterval: 10000,
   });
 
   const addDemoAlert = async () => {
@@ -38,7 +37,6 @@ export default function Alerts() {
   };
 
   const clearHistory = async () => {
-    // 简单实现：清空本地（生产可加 DELETE 接口）
     localStorage.removeItem('vigil-alerts');
     refetch();
   };
