@@ -258,16 +258,40 @@ async def push_alert(alert):
 
 ## Web Dashboard
 
-A real-time server monitoring dashboard built with React + TypeScript + Vite, deployed via Cloudflare Pages + Functions.
+A real-time server monitoring dashboard built with **React + TypeScript + Vite**, deployed via **Cloudflare Pages + Functions**.
 
 ### Quick Deploy
 
+```bash
 cd dash
 npm install
 npm run build
+
+# 1. Deploy to Cloudflare Pages
 npx wrangler pages deploy dist/
 
+# 2. Set the API URL environment variable in Cloudflare Dashboard:
+#    Pages project -> Settings -> Environment variables
+#    VIGIL_API_URL = https://monitor.your-domain.com/status
+
+# 3. (Optional) Bind a custom domain:
+#    Pages project -> Custom domains -> Set up custom domain
+#    -> e.g. status.your-domain.com
+#    Cloudflare auto-provisions SSL and DNS.
+```
+
 ### Features
+
+- Real-time server status (online/offline, latency, packet loss)
+- System metrics (CPU, memory, uptime)
+- Auto-refresh every 30 seconds
+- Dark theme, mobile-responsive
+
+The dashboard source code is in the `dash/` directory.
+
+---
+
+
 
 - Real-time server status (online/offline, latency, packet loss)
 - System metrics (CPU, memory, uptime)

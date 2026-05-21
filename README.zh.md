@@ -256,6 +256,41 @@ async def push_alert(alert):
     await application.bot.send_message(chat_id=你的聊天ID, text=text)
 ```
 
+## Web Dashboard 🌐
+
+基于 **React + TypeScript + Vite** 的实时服务器监控面板，通过 **Cloudflare Pages + Functions** 部署。
+
+### 快速部署
+
+```bash
+cd dash
+npm install
+npm run build
+
+# 1. 部署到 Cloudflare Pages
+npx wrangler pages deploy dist/
+
+# 2. 在 Cloudflare Dashboard 设置环境变量：
+#    Pages 项目 → Settings → Environment variables
+#    VIGIL_API_URL = https://monitor.your-domain.com/status
+
+# 3. （可选）绑定自定义域名：
+#    Pages 项目 → Custom domains → Set up custom domain
+#    → 例如 status.your-domain.com
+#    Cloudflare 会自动配置 SSL 和 DNS。
+```
+
+### 功能特点
+
+- 实时服务器状态（在线/离线、延迟、丢包率）
+- 系统指标（CPU、内存、运行时间）
+- 每 30 秒自动刷新
+- 暗色主题，移动端自适应
+
+面板源码在 `dash/` 目录下。
+
+---
+
 ## 为什么用 Vigil？
 
 **相比 LLM-Wiki 或传统 RAG**——这是一个真正服务于真实服务器的监控系统。没有"增量知识编译"，没有"图谱检索"。只是一个读取 `/proc/` 并推送 JSON 的 Go 二进制。
