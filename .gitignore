@@ -32,7 +32,6 @@ go.work.sum
 # .vscode/
 # Go build artifacts
 agent/vigil-agent
-agent/vagil-agent
 *.test
 *.out
 
