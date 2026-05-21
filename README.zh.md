@@ -5,6 +5,7 @@
     <a href="#features-">特性</a> •
     <a href="#architecture-">架构</a> •
     <a href="#quick-start-">快速开始</a> •
+    <a href="#security-">安全与 HTTPS</a> •
     <a href="#metrics-">采集指标</a> •
     <a href="#license-">许可证</a>
   </p>
@@ -15,7 +16,7 @@
 
 ---
 
-**Vigil** 是一个轻量级服务器监控系统。与传统中心化轮询（ping/SNMP）不同，Vigil 在每台服务器上运行一个极小的 Go Agent，主动读取 `/proc/` 指标并通过 HTTP 推送到中心采集端。
+**Vigil** 是一个轻量级服务器监控系统。与传统中心化轮询（ping/SNMP）不同，Vigil 在每台服务器上运行一个极小的 Go Agent，主动读取 `/proc/` 指标并通过 HTTP/HTTPS 推送到中心采集端。
 
 ## 特性 ✨
 
@@ -23,19 +24,21 @@
 - **双架构支持** — 预编译 `linux/amd64` 和 `linux/arm64` 两个版本
 - **主动推送模式** — 被监控服务器无需开放任何入站端口
 - **Systemd 托管** — 崩溃自动重启，日志通过 journalctl 查看
-- **极简采集端** — Python 3 HTTP 服务 + SQLite，不需要外部数据库
-- **阈值告警** — CPU/内存/磁盘超限自动推送 Telegram
+- **极简采集端** — Python 3 HTTP/HTTPS 服务 + SQLite，不需要外部数据库
+- **Token 认证** — 可选共享密钥保护 /report 接口
+- **HTTPS 支持** — 原生 TLS（传入 certfile/keyfile 即可）
+- **阈值 + 离线告警** — CPU/内存/磁盘 + 后台自动检测离线
 - **CI 自动编译** — 打 tag 推送到 GitHub 自动编译，Releases 页直接下载
 
 ## 架构 🏗
 
 ```
-每台服务器 --> Agent (Go) --> HTTP POST /report --> 采集端 (Python) --> SQLite --> 告警 --> Telegram
+每台服务器 --> Agent (Go) --> HTTP/HTTPS POST /report --> 采集端 (Python) --> SQLite --> 告警 --> Telegram
 ```
 
 | 组件 | 语言 | 作用 |
 |------|------|------|
-| **Agent** | Go | 运行在各服务器上，采集 `/proc/*` 指标，推送到采集端 |
+| **Agent** | Go | 运行在各服务器上，采集 `/proc/*` 指标，推送到采集端（支持 https://） |
 | **采集端** | Python 3 | 接收上报数据，存入 SQLite，计算告警规则 |
 | **存储** | SQLite | 嵌入式零配置，每台服务器保留 7 天历史 |
 | **告警引擎** | Python | 基于阈值的 CPU/内存/磁盘/离线告警，带冷却防刷 |
@@ -61,9 +64,10 @@ GOOS=linux GOARCH=arm64 go build -o vigil-agent-linux-arm64 ./...
 
 ```json
 {
-    "server_url": "http://your-collector:9901",
+    "server_url": "https://your-collector:9901",
     "interval": 30,
-    "hostname": "my-server-01"
+    "hostname": "my-server-01",
+    "token": "super-secret-123"   // 可选但推荐
 }
 ```
 
@@ -83,7 +87,7 @@ systemctl enable --now vigil-agent
 或用一键安装脚本：
 
 ```bash
-bash deploy/install.sh amd64 my-server-01 http://your-collector:9901
+bash deploy/install.sh amd64 my-server-01 https://your-collector:9901
 ```
 
 ### 4. 配置采集端
@@ -91,7 +95,7 @@ bash deploy/install.sh amd64 my-server-01 http://your-collector:9901
 将采集端组件集成到你的 Python Bot 中：
 
 ```python
-from receiver import start_vigil_server
+from receiver import start_vigil_server, start_offline_checker
 from storage import VigilStorage
 from alerts import VigilAlertEngine
 
@@ -107,10 +111,33 @@ engine = VigilAlertEngine({
 def alert_callback(alert):
     print(f"告警: {alert['hostname']} - {alert['message']}")
 
-start_vigil_server("0.0.0.0", 9901, storage, engine, alert_callback)
+# 启动 HTTPS + Token 服务器
+start_vigil_server("0.0.0.0", 9901, storage, engine, alert_callback,
+                   token="super-secret-123",
+                   certfile="/path/to/fullchain.pem",
+                   keyfile="/path/to/privkey.pem")
+
+# 启用自动离线告警（后台线程）
+start_offline_checker(storage, engine, alert_callback, check_interval=60)
 ```
 
 完整源码见 `bot-ext/` 目录。
+
+## 安全与 HTTPS 🔒
+
+**Token 认证**（生产环境强烈推荐）
+- 在 Agent 的 config.json 和采集端设置相同的 `token`
+- 采集端会拒绝 token 不匹配的请求（返回 401）
+- HTTP 和 HTTPS 都支持
+
+**HTTPS 支持**
+- 调用 `start_vigil_server` 时传入 `certfile` 和 `keyfile`（PEM 格式）
+- Agent 遇到 `https://` 开头的 server_url 会自动使用 TLS
+- Go Agent 无需任何修改
+
+**离线自动检测**
+- `start_offline_checker(...)` 启动守护线程，每 N 秒检查 `last_seen`
+- 超过阈值自动触发 **critical** 级别离线告警
 
 ## 采集指标 📊
 
