@@ -6,6 +6,7 @@
     <a href="#architecture-">架构</a> •
     <a href="#quick-start-">快速开始</a> •
     <a href="#security-">安全与 HTTPS</a> •
+    <a href="#docker-">Docker 部署</a> •
     <a href="#metrics-">采集指标</a> •
     <a href="#license-">许可证</a>
   </p>
@@ -138,6 +139,38 @@ start_offline_checker(storage, engine, alert_callback, check_interval=60)
 **离线自动检测**
 - `start_offline_checker(...)` 启动守护线程，每 N 秒检查 `last_seen`
 - 超过阈值自动触发 **critical** 级别离线告警
+
+## Docker 部署 🐳
+
+### 使用 Docker Compose 快速部署
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/dorokuma/vigil.git
+cd vigil/deploy
+
+# 2. 生成自签名证书（或使用真实证书）
+./generate-selfsigned-cert.sh your-server-ip-or-domain
+
+# 3. 创建你的集成脚本（your-bot.py）
+#    参考 bot-ext/ 目录里的 receiver.py、storage.py、alerts.py
+
+# 4. 编辑 docker-compose.yml（修改 TOKEN、路径等）
+
+# 5. 启动服务
+docker compose up -d
+
+# 查看日志
+docker compose logs -f
+```
+
+完整示例见 `deploy/docker-compose.yml`（包含健康检查、数据库持久化、证书挂载）。
+
+**生产环境建议：**
+- 使用真实证书（Let's Encrypt + certbot）
+- 为 `vigil.db` 挂载持久化卷
+- 通过环境变量设置强密码 TOKEN
+- 如需更强安全，可在前面加 Nginx/Traefik 反向代理
 
 ## 采集指标 📊
 
