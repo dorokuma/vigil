@@ -1,5 +1,6 @@
 {
     "server_url": "http://your-server:9901",
     "interval": 30,
-    "hostname": ""
+    "hostname": "",
+    "token": "your-secret-token-here"  // optional, set same value in collector for auth
 }
