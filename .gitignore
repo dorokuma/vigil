@@ -30,3 +30,29 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+# Go build artifacts
+agent/vigil-agent
+agent/vagil-agent
+*.test
+*.out
+
+# Cross-compiled binaries
+deploy/vigil-agent-linux-*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
