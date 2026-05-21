@@ -6,6 +6,7 @@
     <a href="#architecture">Architecture</a> •
     <a href="#quick-start">Quick Start</a> •
     <a href="#security">Security & HTTPS</a> •
+    <a href="#docker">Docker Deployment</a> •
     <a href="#metrics">Metrics</a> •
     <a href="#license">License</a>
   </p>
@@ -138,6 +139,38 @@ See `bot-ext/` for the full source.
 **Offline Auto-Detection**
 - `start_offline_checker(...)` runs a daemon thread that checks `last_seen` every N seconds
 - Triggers **critical** alerts when an agent stops reporting
+
+## Docker Deployment 🐳
+
+### Quick Start with Docker Compose
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/dorokuma/vigil.git
+cd vigil/deploy
+
+# 2. Generate self-signed certificate (or bring your own)
+./generate-selfsigned-cert.sh your-server-ip-or-domain
+
+# 3. Create your integration script (your-bot.py)
+#    See bot-ext/ for receiver.py, storage.py, alerts.py
+
+# 4. Edit docker-compose.yml (set TOKEN, paths, etc.)
+
+# 5. Start everything
+docker compose up -d
+
+# Check logs
+docker compose logs -f
+```
+
+See `deploy/docker-compose.yml` for the full example (includes healthcheck, volume mounts for DB and certs).
+
+**Production tips:**
+- Use real certificates (Let's Encrypt via certbot)
+- Mount persistent volume for `vigil.db`
+- Set strong `TOKEN` via environment variable
+- Run behind reverse proxy (Nginx/Traefik) for extra security if needed
 
 ## Metrics
 
