@@ -1,10 +1,11 @@
 """
 Vigil - Agent HTTP receiver
 Receives monitoring data from agents via HTTP POST.
-Supports optional token auth and background offline checking.
+Supports optional token auth, HTTPS, and background offline checking.
 """
 import json
 import logging
+import ssl
 import threading
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -117,14 +118,23 @@ class VigilHandler(BaseHTTPRequestHandler):
         logger.debug("HTTP %s", fmt % args)
 
 
-def start_vigil_server(host, port, storage, alert_engine, alert_callback, token=None):
+def start_vigil_server(host, port, storage, alert_engine, alert_callback, token=None, certfile=None, keyfile=None):
     VigilHandler.storage = storage
     VigilHandler.alert_engine = alert_engine
     VigilHandler.alert_callback = alert_callback
     VigilHandler.expected_token = token
 
     server = HTTPServer((host, port), VigilHandler)
-    logger.info("Vigil receiver started: http://%s:%s (token auth: %s)", host, port, "enabled" if token else "disabled")
+
+    if certfile and keyfile:
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(certfile, keyfile)
+        server.socket = context.wrap_socket(server.socket, server_side=True)
+        proto = "HTTPS"
+    else:
+        proto = "HTTP"
+
+    logger.info("Vigil receiver started: %s://%s:%s (token: %s)", proto, host, port, "enabled" if token else "disabled")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
