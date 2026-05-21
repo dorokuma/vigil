@@ -51,9 +51,20 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/servers') {
+      const cacheKey = new Request('https://dash/api/servers', { method: 'GET' });
+      const cache = caches.default;
+
+      // 尝试从 Cloudflare Edge Cache 获取（白嫖 99% 请求）
+      let response = await cache.match(cacheKey);
+      if (response) {
+        return response;
+      }
+
       try {
         const apiUrl = env.VIGIL_API_URL || 'http://127.0.0.1:9901/status';
-        const originResponse = await fetch(apiUrl);
+        const originResponse = await fetch(apiUrl, {
+          cf: { cacheTtl: 15, cacheEverything: true }
+        });
         const rawData: VigilServerData[] = await originResponse.json();
 
         const enriched: EnrichedServer[] = rawData
@@ -67,16 +78,22 @@ export default {
             uptime: formatUptime(server.uptime),
             cpu: Math.round(server.cpu_percent || 0),
             memory: Math.round(server.memory_percent || 0),
-            disk: 0, // 磁盘数据在 Agent 上报的 disks[] 数组里，Vigil /status 简化版暂不包含
+            disk: 0,
           }));
 
-        return new Response(JSON.stringify(enriched), {
+        const jsonResponse = new Response(JSON.stringify(enriched), {
           headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
-            'Cache-Control': 'public, max-age=15',
+            'Cache-Control': 'public, max-age=20, s-maxage=30',
+            'CDN-Cache-Control': 'max-age=30',
           },
         });
+
+        // 写入 Cloudflare Edge Cache（免费且全球加速）
+        await cache.put(cacheKey, jsonResponse.clone());
+
+        return jsonResponse;
       } catch (err) {
         return new Response(JSON.stringify({ error: 'Failed to fetch server data' }), {
           status: 502,
@@ -85,7 +102,6 @@ export default {
       }
     }
 
-    // 前端静态文件由 Cloudflare Pages 处理，Worker 只处理 API
     return new Response('Not Found', { status: 404 });
   },
 } satisfies ExportedHandler<Env>;
