@@ -122,7 +122,23 @@ start_vigil_server("0.0.0.0", 9901, storage, engine, alert_callback,
 start_offline_checker(storage, engine, alert_callback, check_interval=60)
 ```
 
-完整源码见 `bot-ext/` 目录。
+### 5. 或直接运行完整 Bot
+
+克隆本仓库，直接使用 `bot/` 模块：
+
+```bash
+cp bot/config.example.py bot/config.py
+# 编辑 bot/config.py 填入你的配置
+python bot/main.py
+```
+
+Bot 包含以下功能：
+- **Pinger** — 基于 ping 的延迟和丢包检测
+- **Receiver** — 接收 Agent 上报数据的 HTTP/HTTPS 服务
+- **Alert Engine** — 对 Agent 数据和 Pinger 结果进行阈值告警
+- **Offline Checker** — 后台线程自动检测离线服务器
+
+完整源码见 `bot/` 目录。
 
 ## 安全与 HTTPS 🔒
 

@@ -1,7 +1,7 @@
 """
-Vigil - Agent HTTP receiver
-Receives monitoring data from agents via HTTP POST.
-Supports optional token auth, HTTPS, and background offline checking.
+Vigil - Agent HTTP 接收端
+接收 Agent 上报的监控数据
+支持可选的 Token 认证、HTTPS 和后台离线检测
 """
 import json
 import logging
@@ -39,7 +39,7 @@ class VigilHandler(BaseHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body)
 
-            # Token auth check (if enabled)
+            # Token 验证
             if VigilHandler.expected_token:
                 if data.get("token") != VigilHandler.expected_token:
                     self.send_response(401)
@@ -58,7 +58,7 @@ class VigilHandler(BaseHTTPRequestHandler):
             else:
                 self.storage.save_report(hostname, report_data)
                 if self.alert_engine and self.alert_callback:
-                    alerts = self.alert_engine.check(hostname, report_data)
+                    alerts = self.alert_engine.check_agent_report(hostname, report_data)
                     for alert in alerts:
                         try:
                             self.alert_callback(alert)
@@ -83,15 +83,22 @@ class VigilHandler(BaseHTTPRequestHandler):
 
     def _handle_status(self):
         try:
-            records = self.storage.get_latest_all()
+            # 合并 Agent 数据和 Pinger 数据
+            agent_records = self.storage.get_latest_all()
+            ping_records = self.storage.get_ping_latest_all()
+            ping_map = {r["hostname"]: r["data"] for r in ping_records if r.get("data")}
+
             result = []
-            for record in records:
+            for record in agent_records:
                 data = record.get("data", {})
                 system = data.get("system", {})
                 cpu = data.get("cpu", {})
                 memory = data.get("memory", {})
-                result.append({
-                    "hostname": record["hostname"],
+                hostname = record["hostname"]
+
+                item = {
+                    "hostname": hostname,
+                    "source": "agent",
                     "is_offline": bool(record["is_offline"]),
                     "last_seen": record["last_seen"],
                     "uptime": system.get("uptime_sec", 0),
@@ -102,7 +109,34 @@ class VigilHandler(BaseHTTPRequestHandler):
                         "5m": cpu.get("load_5", 0),
                         "15m": cpu.get("load_15", 0),
                     },
-                })
+                }
+
+                # 合并 Pinger 数据
+                if hostname in ping_map:
+                    pinger_data = ping_map[hostname].get("pinger", {})
+                    item["rtt"] = pinger_data.get("rtt", 0)
+                    item["loss_pct"] = pinger_data.get("loss_pct", 0)
+
+                result.append(item)
+
+            # 只有 Pinger 数据但没有 Agent 数据的服务器
+            for r in ping_records:
+                hostname = r["hostname"]
+                if hostname not in {x["hostname"] for x in result}:
+                    pinger_data = r.get("data", {}).get("pinger", {})
+                    result.append({
+                        "hostname": hostname,
+                        "source": "pinger",
+                        "is_offline": bool(r.get("is_offline", False)),
+                        "last_seen": r["last_seen"],
+                        "uptime": 0,
+                        "cpu_percent": 0,
+                        "memory_percent": 0,
+                        "load": {"1m": 0, "5m": 0, "15m": 0},
+                        "rtt": pinger_data.get("rtt", 0),
+                        "loss_pct": pinger_data.get("loss_pct", 0),
+                    })
+
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
@@ -118,7 +152,8 @@ class VigilHandler(BaseHTTPRequestHandler):
         logger.debug("HTTP %s", fmt % args)
 
 
-def start_vigil_server(host, port, storage, alert_engine, alert_callback, token=None, certfile=None, keyfile=None):
+def start_vigil_server(host, port, storage, alert_engine, alert_callback,
+                       token=None, certfile=None, keyfile=None):
     VigilHandler.storage = storage
     VigilHandler.alert_engine = alert_engine
     VigilHandler.alert_callback = alert_callback
@@ -134,7 +169,8 @@ def start_vigil_server(host, port, storage, alert_engine, alert_callback, token=
     else:
         proto = "HTTP"
 
-    logger.info("Vigil receiver started: %s://%s:%s (token: %s)", proto, host, port, "enabled" if token else "disabled")
+    logger.info("Vigil receiver started: %s://%s:%s (token: %s)",
+                proto, host, port, "enabled" if token else "disabled")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -143,7 +179,7 @@ def start_vigil_server(host, port, storage, alert_engine, alert_callback, token=
 
 
 def start_offline_checker(storage, alert_engine, alert_callback, check_interval=60):
-    """后台守护线程：定期检查离线服务器并自动触发 critical 告警"""
+    """后台守护线程：定期检查离线服务器并触发告警"""
     def _checker():
         while True:
             try:

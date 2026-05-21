@@ -122,7 +122,23 @@ start_vigil_server("0.0.0.0", 9901, storage, engine, alert_callback,
 start_offline_checker(storage, engine, alert_callback, check_interval=60)
 ```
 
-See `bot-ext/` for the full source.
+### 5. Or Run the Complete Bot
+
+Clone this repo and use the ready-to-run `bot/` module:
+
+```bash
+cp bot/config.example.py bot/config.py
+# edit bot/config.py with your settings
+python bot/main.py
+```
+
+The bot includes:
+- **Pinger** — ping-based latency and packet loss detection for any hosts
+- **Receiver** — HTTP/HTTPS server receiving agent reports
+- **Alert Engine** — threshold-based alerts for both agent data and ping results
+- **Offline Checker** — background thread that detects silent agents
+
+See `bot/` for the full source.
 
 ## Security & HTTPS 🔒
 
