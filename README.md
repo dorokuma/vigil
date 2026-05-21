@@ -256,6 +256,26 @@ async def push_alert(alert):
     await application.bot.send_message(chat_id=YOUR_CHAT_ID, text=text)
 ```
 
+## Web Dashboard
+
+A real-time server monitoring dashboard built with React + TypeScript + Vite, deployed via Cloudflare Pages + Functions.
+
+### Quick Deploy
+
+cd dash
+npm install
+npm run build
+npx wrangler pages deploy dist/
+
+### Features
+
+- Real-time server status (online/offline, latency, packet loss)
+- System metrics (CPU, memory, uptime)
+- Auto-refresh every 30 seconds
+- Dark theme, mobile-responsive
+
+---
+
 ## Why Vigil?
 
 **Instead of LLM-Wiki / traditional RAG** — this is a real monitoring system for real servers. No "incremental knowledge compilation," no "graph-based retrieval." Just a Go binary that reads `/proc/` and pushes JSON.
