@@ -15,12 +15,13 @@ type Config struct {
 	ServerURL string `json:"server_url"`
 	Interval  int    `json:"interval"`
 	Hostname  string `json:"hostname"`
+	Token     string `json:"token"`
 }
 
 func main() {
 	cfg := loadConfig()
 	coll := collector.New()
-	rep := reporter.New(cfg.ServerURL, cfg.Hostname)
+	rep := reporter.New(cfg.ServerURL, cfg.Hostname, cfg.Token)
 
 	ticker := time.NewTicker(time.Duration(cfg.Interval) * time.Second)
 	defer ticker.Stop()
@@ -54,6 +55,7 @@ func loadConfig() Config {
 		ServerURL: "http://localhost:9901",
 		Interval:  30,
 		Hostname:  "",
+		Token:     "",
 	}
 	data, err := os.ReadFile("/etc/vigil/config.json")
 	if err != nil {
