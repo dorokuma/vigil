@@ -35,5 +35,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: vigil-agent-linux-*/
+          files: |
+            vigil-agent-linux-amd64/vigil-agent-linux-amd64
+            vigil-agent-linux-arm64/vigil-agent-linux-arm64
           generate_release_notes: true
