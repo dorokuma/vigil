@@ -5,7 +5,7 @@ import {
   getFilteredRowModel,
   flexRender,
   createColumnHelper,
-  SortingState,
+  type SortingState,
 } from '@tanstack/react-table';
 import { useState } from 'react';
 
