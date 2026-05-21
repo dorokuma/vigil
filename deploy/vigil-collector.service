@@ -1,0 +1,22 @@
+[Unit]
+Description=Vigil Collector (Python receiver with HTTPS + Token)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data                    # change to your user if needed
+Group=www-data
+WorkingDirectory=/opt/vigil
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/vigil/your-bot.py
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/vigil
+
+[Install]
+WantedBy=multi-user.target
