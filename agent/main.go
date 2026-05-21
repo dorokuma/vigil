@@ -63,6 +63,10 @@ func loadConfig() Config {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		log.Printf("Config parse error: %v, using defaults", err)
 	}
+	if cfg.Interval < 10 {
+		cfg.Interval = 30
+		log.Printf("Interval too small (<10), reset to 30s")
+	}
 	if cfg.Hostname == "" {
 		hostname, err := os.Hostname()
 		if err != nil {

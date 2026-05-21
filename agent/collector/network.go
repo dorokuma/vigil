@@ -21,9 +21,8 @@ type netSample struct {
 	time             time.Time
 }
 
-var prevNet = make(map[string]netSample)
 
-func GetNetworkStats() []NetStat {
+func (c *Collector) GetNetworkStats() []NetStat {
 	var stats []NetStat
 	f, err := os.Open("/proc/net/dev")
 	if err != nil {
@@ -50,7 +49,7 @@ func GetNetworkStats() []NetStat {
 		txBytes, _ := strconv.ParseUint(fields[9], 10, 64)
 
 		stat := NetStat{Interface: iface, RxBytes: rxBytes, TxBytes: txBytes}
-		if prev, ok := prevNet[iface]; ok {
+		if prev, ok := c.netPrev[iface]; ok {
 			elapsed := now.Sub(prev.time).Seconds()
 			if elapsed > 0 {
 				stat.RxSpeed = uint64(float64(rxBytes-prev.rxBytes) / elapsed)
@@ -58,7 +57,7 @@ func GetNetworkStats() []NetStat {
 			}
 		}
 		stats = append(stats, stat)
-		prevNet[iface] = netSample{rxBytes: rxBytes, txBytes: txBytes, time: now}
+		c.netPrev[iface] = netSample{rxBytes: rxBytes, txBytes: txBytes, time: now}
 	}
 	return stats
 }

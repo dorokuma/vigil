@@ -11,7 +11,17 @@ ARCH=$1
 HOSTNAME=$2
 SERVER_URL=${3:-"http://your-server:9901"}
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cp "$SCRIPT_DIR/vigil-agent-linux-$ARCH" /usr/local/bin/vigil-agent
+BINARY="$SCRIPT_DIR/vigil-agent-linux-$ARCH"
+
+# Check binary exists before copying
+if [ ! -f "$BINARY" ]; then
+    echo "ERROR: Binary not found: $BINARY"
+    echo "Make sure you have the correct architecture: amd64 or arm64"
+    echo "And the compiled binary exists in the deploy directory."
+    exit 1
+fi
+
+cp "$BINARY" /usr/local/bin/vigil-agent
 chmod +x /usr/local/bin/vigil-agent
 mkdir -p /etc/vigil
 cat > /etc/vigil/config.json << CONFIGEOF

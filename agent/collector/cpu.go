@@ -16,10 +16,7 @@ type CPUStat struct {
 	Load15  float64 `json:"load_15"`
 }
 
-var prevIdle, prevTotal uint64
-var prevTime time.Time
-
-func GetCPUStat() CPUStat {
+func (c *Collector) GetCPUStat() CPUStat {
 	var stat CPUStat
 
 	data, err := os.ReadFile("/proc/loadavg")
@@ -55,21 +52,21 @@ func GetCPUStat() CPUStat {
 		idle := vals[3]
 		total := vals[0] + vals[1] + vals[2] + vals[3] + vals[4] + vals[5] + vals[6] + vals[7]
 
-		if prevTotal == 0 {
-			prevIdle = idle
-			prevTotal = total
-			prevTime = time.Now()
+		if c.cpuPrevTotal == 0 {
+			c.cpuPrevIdle = idle
+			c.cpuPrevTotal = total
+			c.cpuPrevTime = time.Now()
 			return stat
 		}
 
-		deltaIdle := idle - prevIdle
-		deltaTotal := total - prevTotal
+		deltaIdle := idle - c.cpuPrevIdle
+		deltaTotal := total - c.cpuPrevTotal
 		if deltaTotal > 0 {
 			stat.Percent = float64(deltaTotal-deltaIdle) / float64(deltaTotal) * 100.0
 		}
-		prevIdle = idle
-		prevTotal = total
-		prevTime = time.Now()
+		c.cpuPrevIdle = idle
+		c.cpuPrevTotal = total
+		c.cpuPrevTime = time.Now()
 		break
 	}
 	return stat
