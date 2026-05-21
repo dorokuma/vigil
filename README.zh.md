@@ -7,6 +7,7 @@
     <a href="#quick-start-">快速开始</a> •
     <a href="#security-">安全与 HTTPS</a> •
     <a href="#docker-">Docker 部署</a> •
+    <a href="#full-deploy-">完整部署指南</a> •
     <a href="#metrics-">采集指标</a> •
     <a href="#license-">许可证</a>
   </p>
@@ -34,7 +35,7 @@
 ## 架构 🏗
 
 ```
-每台服务器 --> Agent (Go) --> HTTP/HTTPS POST /report --> 采集端 (Python) --> SQLite --> 告警 --> Telegram
+每台服务器 --> Agent (Go) --> HTTP/HTTPS POST /report --> 采集端 (Python) --> SQLite --> 告警 --> Telegram + Web Dashboard
 ```
 
 | 组件 | 语言 | 作用 |
@@ -43,6 +44,7 @@
 | **采集端** | Python 3 | 接收上报数据，存入 SQLite，计算告警规则 |
 | **存储** | SQLite | 嵌入式零配置，每台服务器保留 7 天历史 |
 | **告警引擎** | Python | 基于阈值的 CPU/内存/磁盘/离线告警，带冷却防刷 |
+| **Web Dashboard** | React + TS | 实时监控界面，部署在 Cloudflare Pages + Functions |
 
 ## 快速开始 🚀
 
@@ -188,6 +190,41 @@ docker compose logs -f
 - 通过环境变量设置强密码 TOKEN
 - 如需更强安全，可在前面加 Nginx/Traefik 反向代理
 
+## 完整部署指南（推荐）
+
+### 完整栈部署（Agent + Bot + Dashboard）
+
+1. **部署 Web Dashboard**（Cloudflare - 免费）
+   ```bash
+   cd dash
+   npm install
+   npm run build
+   npx wrangler pages deploy dist --project-name=vigil-dash
+   ```
+   然后在 Cloudflare Pages 设置中添加环境变量 `VIGIL_API_URL`。
+
+2. **运行 Python Bot**（支持真实告警推送到 Dashboard）
+   ```bash
+   cp bot/config.example.py bot/config.py
+   # 编辑 bot/config.py：
+   #   - 设置 Telegram Token
+   #   - 设置 CF_ALERT_URL = "https://your-dash.pages.dev/api/alerts"
+   python bot/main.py
+   ```
+
+3. **在服务器上部署 Agent**（Go 二进制 + systemd）
+   使用一键脚本：
+   ```bash
+   bash deploy/install.sh amd64 my-server-01 https://your-bot-domain:9901
+   ```
+
+4. **（可选）使用 Cloudflare Tunnel 安全暴露**
+   ```bash
+   bash deploy/setup-cloudflare-tunnel.sh
+   ```
+
+现在你拥有了一个**完整的免费全球监控系统**，包含实时仪表盘和告警历史！
+
 ## 采集指标 📊
 
 所有指标通过读取 `/proc/` 获取，不依赖外部命令。
@@ -255,41 +292,6 @@ async def push_alert(alert):
     text = f"{icon} {alert['hostname']}\n{alert['message']}"
     await application.bot.send_message(chat_id=你的聊天ID, text=text)
 ```
-
-## Web Dashboard 🌐
-
-基于 **React + TypeScript + Vite** 的实时服务器监控面板，通过 **Cloudflare Pages + Functions** 部署。
-
-### 快速部署
-
-```bash
-cd dash
-npm install
-npm run build
-
-# 1. 部署到 Cloudflare Pages
-npx wrangler pages deploy dist/
-
-# 2. 在 Cloudflare Dashboard 设置环境变量：
-#    Pages 项目 → Settings → Environment variables
-#    VIGIL_API_URL = https://monitor.your-domain.com/status
-
-# 3. （可选）绑定自定义域名：
-#    Pages 项目 → Custom domains → Set up custom domain
-#    → 例如 status.your-domain.com
-#    Cloudflare 会自动配置 SSL 和 DNS。
-```
-
-### 功能特点
-
-- 实时服务器状态（在线/离线、延迟、丢包率）
-- 系统指标（CPU、内存、运行时间）
-- 每 30 秒自动刷新
-- 暗色主题，移动端自适应
-
-面板源码在 `dash/` 目录下。
-
----
 
 ## 为什么用 Vigil？
 
