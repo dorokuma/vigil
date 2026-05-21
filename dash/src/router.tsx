@@ -2,19 +2,31 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  Link,
 } from '@tanstack/react-router'
 import { Outlet } from '@tanstack/react-router'
 import { QueryClient } from '@tanstack/react-query'
 import Dashboard from './pages/Dashboard'
+import Alerts from './pages/Alerts'
 
 // 根路由
 const rootRoute = createRootRoute({
   component: () => (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
-      <header className="border-b border-gray-800 px-6 py-4">
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <header className="border-b border-zinc-800 px-6 py-4 sticky top-0 bg-zinc-950/80 backdrop-blur z-50">
         <div className="mx-auto max-w-7xl flex items-center justify-between">
-          <h1 className="text-xl font-bold text-cyan-400">✨ Server Dashboard</h1>
-          <span className="text-sm text-gray-500">hotkids.eu 集群监控</span>
+          <div className="flex items-center gap-8">
+            <h1 className="text-xl font-bold text-cyan-400">✨ Vigil</h1>
+            <nav className="flex items-center gap-6 text-sm">
+              <Link to="/" className="hover:text-cyan-400 transition-colors data-[status=active]:text-cyan-400" activeOptions={{ exact: true }}>
+                服务器
+              </Link>
+              <Link to="/alerts" className="hover:text-cyan-400 transition-colors data-[status=active]:text-cyan-400">
+                告警历史
+              </Link>
+            </nav>
+          </div>
+          <span className="text-xs text-zinc-500">Cloudflare + TanStack</span>
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-6 py-8">
@@ -31,7 +43,13 @@ const indexRoute = createRoute({
   component: Dashboard,
 })
 
-const routeTree = rootRoute.addChildren([indexRoute])
+const alertsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/alerts',
+  component: Alerts,
+})
+
+const routeTree = rootRoute.addChildren([indexRoute, alertsRoute])
 
 export function createAppRouter(queryClient: QueryClient) {
   return createRouter({
