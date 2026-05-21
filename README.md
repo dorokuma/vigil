@@ -7,6 +7,7 @@
     <a href="#quick-start">Quick Start</a> •
     <a href="#security">Security & HTTPS</a> •
     <a href="#docker">Docker Deployment</a> •
+    <a href="#full-deploy">Full Deployment Guide</a> •
     <a href="#metrics">Metrics</a> •
     <a href="#license">License</a>
   </p>
@@ -34,7 +35,7 @@
 ## Architecture
 
 ```
-Every server --> Agent (Go) --> HTTP/HTTPS POST /report --> Collector (Python) --> SQLite --> Alerts --> Telegram
+Every server --> Agent (Go) --> HTTP/HTTPS POST /report --> Collector (Python) --> SQLite --> Alerts --> Telegram + Web Dashboard
 ```
 
 | Component | Language | Role |
@@ -43,6 +44,7 @@ Every server --> Agent (Go) --> HTTP/HTTPS POST /report --> Collector (Python) -
 | **Collector** | Python 3 | Receives reports via HTTP/HTTPS, stores in SQLite, evaluates alert rules |
 | **Storage** | SQLite | Embedded, zero-config, keeps 7-day history per server |
 | **Alert Engine** | Python | Threshold-based CPU/Memory/Disk/Offline alerts with cooldown |
+| **Web Dashboard** | React + TS | Real-time UI deployed on Cloudflare Pages + Functions |
 
 ## Quick Start
 
@@ -188,6 +190,41 @@ See `deploy/docker-compose.yml` for the full example (includes healthcheck, volu
 - Set strong `TOKEN` via environment variable
 - Run behind reverse proxy (Nginx/Traefik) for extra security if needed
 
+## Full Deployment Guide (Recommended)
+
+### Complete Stack (Agent + Bot + Dashboard)
+
+1. **Deploy the Web Dashboard** (Cloudflare - Free)
+   ```bash
+   cd dash
+   npm install
+   npm run build
+   npx wrangler pages deploy dist --project-name=vigil-dash
+   ```
+   Then set environment variable `VIGIL_API_URL` in Cloudflare Pages settings.
+
+2. **Run the Python Bot** (with real alert push to Dashboard)
+   ```bash
+   cp bot/config.example.py bot/config.py
+   # Edit bot/config.py:
+   #   - Set your Telegram token
+   #   - Set CF_ALERT_URL = "https://your-dash.pages.dev/api/alerts"
+   python bot/main.py
+   ```
+
+3. **Deploy Agents** on your servers (Go binary + systemd)
+   Use the one-liner:
+   ```bash
+   bash deploy/install.sh amd64 my-server-01 https://your-bot-domain:9901
+   ```
+
+4. **(Optional) Secure exposure with Cloudflare Tunnel**
+   ```bash
+   bash deploy/setup-cloudflare-tunnel.sh
+   ```
+
+Now you have a **complete free global monitoring system** with real-time dashboard and alert history!
+
 ## Metrics
 
 All metrics are read from `/proc/` — no external commands, no sudo, no dependencies.
@@ -255,50 +292,6 @@ async def push_alert(alert):
     text = f"{icon} {alert['hostname']}\n{alert['message']}"
     await application.bot.send_message(chat_id=YOUR_CHAT_ID, text=text)
 ```
-
-## Web Dashboard
-
-A real-time server monitoring dashboard built with **React + TypeScript + Vite**, deployed via **Cloudflare Pages + Functions**.
-
-### Quick Deploy
-
-```bash
-cd dash
-npm install
-npm run build
-
-# 1. Deploy to Cloudflare Pages
-npx wrangler pages deploy dist/
-
-# 2. Set the API URL environment variable in Cloudflare Dashboard:
-#    Pages project -> Settings -> Environment variables
-#    VIGIL_API_URL = https://monitor.your-domain.com/status
-
-# 3. (Optional) Bind a custom domain:
-#    Pages project -> Custom domains -> Set up custom domain
-#    -> e.g. status.your-domain.com
-#    Cloudflare auto-provisions SSL and DNS.
-```
-
-### Features
-
-- Real-time server status (online/offline, latency, packet loss)
-- System metrics (CPU, memory, uptime)
-- Auto-refresh every 30 seconds
-- Dark theme, mobile-responsive
-
-The dashboard source code is in the `dash/` directory.
-
----
-
-
-
-- Real-time server status (online/offline, latency, packet loss)
-- System metrics (CPU, memory, uptime)
-- Auto-refresh every 30 seconds
-- Dark theme, mobile-responsive
-
----
 
 ## Why Vigil?
 
