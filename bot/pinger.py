@@ -1,128 +1,170 @@
 """
-Vigil - Pinger 模块
-主动 ping 各服务器，检测延迟和在线率
+Vigil - Pinger 升级版
+每 10 秒并发 ping 所有服务器
+结果写入 SQLite（ping_raw + ping_latest）
+每分钟聚合（ping_history）
 """
 import asyncio
 import logging
 import time
+import re
 
 logger = logging.getLogger(__name__)
 
+# 受监控服务器（继承自旧 engine 的能力，不是代码）
+SERVERS = [
+    {"name": "hongkong",  "address": "103.48.169.189"},
+    {"name": "tokyo",     "address": "158.179.184.242"},
+    {"name": "mumbai",    "address": "144.24.108.241"},
+    {"name": "sanjose",   "address": "2603:c024:c000:8e5e:91b:c01:e04e:390e"},
+    {"name": "columbus",  "address": "2603:c024:c000:8e5e:4d5c:2789:2bd8:668"},
+    {"name": "aione",     "address": "23.173.216.45"},
+    {"name": "singapore", "address": "2a12:bec0:16e:33f::"},
+]
+
 
 class Pinger:
-    """延迟检测器"""
+    """Vigil 升级版 Pinger — 吸收旧 engine 的 ping 能力"""
 
-    def __init__(self, hosts: dict, interval: int = 30, timeout: int = 5, storage=None):
-        """
-        hosts: { "hostname": "ip_or_domain", ... }
-        interval: 每 N 秒检测一轮
-        timeout: 单次 ping 超时（秒）
-        storage: VigilStorage 实例，用于保存结果
-        """
-        self.hosts = hosts
-        self.interval = interval
-        self.timeout = timeout
+    def __init__(self, storage=None):
         self.storage = storage
+        self._running = False
+        self._task = None
+        # 内存缓存最近 120 条（用于 /api/ping/ 快速响应）
+        self.recent_cache = {s["name"]: [] for s in SERVERS}
 
     async def start(self):
-        """启动循环检测"""
-        logger.info("Pinger started: %d hosts every %ds", len(self.hosts), self.interval)
-        while True:
-            t0 = time.time()
-            tasks = [self._ping_one(name, addr) for name, addr in self.hosts.items()]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+        self._running = True
+        self._task = asyncio.create_task(self._run())
+        logger.info("Pinger started: %d servers every 10s", len(SERVERS))
 
-            for result in results:
-                if isinstance(result, Exception):
-                    logger.error("Ping error: %s", result)
-                    continue
-                if self.storage and result:
-                    self._save_ping_result(result)
+    async def stop(self):
+        self._running = False
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
 
-            elapsed = time.time() - t0
-            sleep_time = max(1, self.interval - elapsed)
-            await asyncio.sleep(sleep_time)
+    async def _run(self):
+        last_agg = 0
+        await self._ping_all()
+        last_agg = time.time()
 
-    async def _ping_one(self, hostname: str, address: str) -> dict | None:
-        """对单个服务器执行 ping"""
-        # Linux: ping -c 5 -W timeout address
-        #  -c 5: 发 5 个包
-        #  -W timeout: 超时秒数 (Linux)
-        cmd = ["ping", "-c", "5", "-W", str(self.timeout), address]
+        while self._running:
+            await asyncio.sleep(10)
+            await self._ping_all()
+            now = time.time()
+            if now - last_agg >= 60:
+                await self._aggregate()
+                last_agg = now
+
+    async def _ping_all(self):
+        tasks = [self._ping_one(s) for s in SERVERS]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    def _parse_rtt(self, output: str) -> tuple:
+        """解析 ping 输出，返回 (rtt, success)"""
+        for line in output.split("\n"):
+            m = re.search(r"time=([0-9.]+)\s*ms", line)
+            if m:
+                return float(m.group(1)), True
+        return 0.0, False
+
+    async def _ping_one(self, server: dict):
+        hostname = server["name"]
+        address = server["address"]
+        use_ping6 = ":" in address
 
         try:
+            cmd = ["ping6" if use_ping6 else "ping", "-c", "1"]
+            if not use_ping6:
+                cmd += ["-W", "5"]
+            cmd.append(address)
+
             t0 = time.time()
             proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             )
-            stdout, _ = await asyncio.wait_for(
-                proc.communicate(), timeout=self.timeout * 5 + 5
-            )
-            elapsed = time.time() - t0
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=8)
+            ts = int(t0 * 1000)
             output = stdout.decode(errors="replace")
 
-            # 解析 ping 输出
-            lines = output.strip().split("\n")
-            last_line = lines[-1] if lines else ""
-
-            # 统计发送/接收
-            sent = 5
-            received = 0
-            for line in lines:
-                if "bytes from" in line and "time=" in line:
-                    received += 1
-
-            loss_pct = (sent - received) / sent * 100.0
-
-            # 提取 RTT
-            rtt = 0.0
-            if "min/avg/max" in last_line or "min/avg/max/mdev" in last_line:
-                # Linux 格式: rtt min/avg/max/mdev = 10.123/20.456/30.789/5.012 ms
-                import re
-                match = re.search(r"= [\d.]+/([\d.]+)/[\d.]+/", last_line)
-                if match:
-                    rtt = float(match.group(1))
-
-            return {
-                "hostname": hostname,
-                "address": address,
-                "rtt": rtt,
-                "loss_pct": loss_pct,
-                "sent": sent,
-                "received": received,
-                "timestamp": time.time(),
-                "alive": received > 0,
-            }
-
-        except asyncio.TimeoutError:
-            logger.warning("Ping timeout: %s (%s)", hostname, address)
-            return {
-                "hostname": hostname,
-                "address": address,
-                "rtt": 0,
-                "loss_pct": 100.0,
-                "sent": 5,
-                "received": 0,
-                "timestamp": time.time(),
-                "alive": False,
-            }
+            rtt, ok = self._parse_rtt(output)
+            entry = {"ts": ts, "rtt": rtt, "ok": ok}
         except Exception as e:
-            logger.error("Ping failed: %s (%s): %s", hostname, address, e)
-            return None
+            logger.debug("Ping %s error: %s", hostname, e)
+            ts = int(time.time() * 1000)
+            entry = {"ts": ts, "rtt": 0, "ok": False}
 
-    def _save_ping_result(self, result: dict):
-        """把 ping 结果存入 storage"""
+        # 入内存缓存（最近 120 条）
+        buf = self.recent_cache[hostname]
+        buf.append(entry)
+        if len(buf) > 120:
+            buf.pop(0)
+
+        # 写入 SQLite
+        if self.storage:
+            try:
+                self.storage.save_ping_raw(hostname, ts, entry["rtt"], entry["ok"])
+                self.storage.save_ping_latest(
+                    hostname, entry["rtt"], 0.0 if entry["ok"] else 100.0,
+                    entry["ok"], 1
+                )
+            except Exception as e:
+                logger.error("Storage write error: %s", e)
+
+    async def _aggregate(self):
+        """每分钟聚合，写入 ping_history"""
+        if not self.storage:
+            return
+        now_ts = int(time.time())
+
+        for s in SERVERS:
+            hostname = s["name"]
+            raw = await self._get_raw_from_db(hostname, 6)
+            if not raw:
+                continue
+
+            rtts = [r["rtt"] for r in raw if r["ok"] and r["rtt"] > 0]
+            total = len(raw)
+            success = len(rtts)
+            loss_pct = (total - success) / total * 100 if total > 0 else 0
+
+            if rtts:
+                avg_rtt = sum(rtts) / len(rtts)
+                min_rtt = min(rtts)
+                max_rtt = max(rtts)
+                jitter = sum(abs(rtts[i] - rtts[i-1])
+                             for i in range(1, len(rtts))) / len(rtts) if len(rtts) > 1 else 0
+            else:
+                avg_rtt = min_rtt = max_rtt = jitter = 0
+
+            try:
+                self.storage.save_ping_history(
+                    hostname, now_ts, avg_rtt, min_rtt, max_rtt,
+                    jitter, loss_pct, total
+                )
+            except Exception as e:
+                logger.error("Aggregate write error: %s", e)
+
+    async def _get_raw_from_db(self, hostname, n):
+        """从数据库读取原始 ping 数据（异步包装）"""
+        if not self.storage:
+            return []
         try:
-            # 以 pinger_ 前缀存储，区别于 Agent 上报的数据
-            data = {
-                "pinger": {
-                    "rtt": result["rtt"],
-                    "loss_pct": result["loss_pct"],
-                    "alive": result["alive"],
-                }
-            }
-            self.storage.save_ping_result(result["hostname"], data)
+            return self.storage.get_ping_raw(hostname, n)
         except Exception as e:
-            logger.error("Save ping result error: %s", e)
+            logger.error("DB read error: %s", e)
+            return []
+
+    # ── API 接口 ──
+
+    def get_recent(self, hostname: str, n: int = 60) -> list:
+        """返回最近 n 条 ping 数据（从内存缓存，同步）"""
+        buf = self.recent_cache.get(hostname, [])
+        return buf[-n:]
+
+    def get_servers(self) -> list:
+        return SERVERS

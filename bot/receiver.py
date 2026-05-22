@@ -1,7 +1,7 @@
 """
-Vigil - Agent HTTP 接收端
-接收 Agent 上报的监控数据
-支持可选的 Token 认证、HTTPS 和后台离线检测
+Vigil - HTTP 接收端 + API
+接收 Agent 上报 + 提供 Vigil 原生格式 API
+吸收旧 engine 的 API 能力（用自己的格式）
 """
 import json
 import logging
@@ -19,19 +19,35 @@ class VigilHandler(BaseHTTPRequestHandler):
     alert_engine = None
     alert_callback = None
     expected_token = None
+    pinger = None  # Pinger 实例（同步接口）
+
+    # ── 路由 ──────────────────────────────────────────────
+
+    def do_GET(self):
+        path = urlparse(self.path).path
+        handlers = {
+            "/health": self._handle_health,
+            "/status": self._handle_agent_status,
+            "/api/servers": self._handle_api_servers,
+        }
+        # /api/server/<name>
+        if path.startswith("/api/server/"):
+            handlers[path] = lambda: self._handle_api_server(path[12:])
+        # /api/ping/<name>
+        elif path.startswith("/api/ping/"):
+            handlers[path] = lambda: self._handle_api_ping(path[11:])
+
+        handler = handlers.get(path, self._handle_404)
+        handler()
 
     def do_POST(self):
         path = urlparse(self.path).path
         if path == "/report":
             self._handle_report()
-        elif path == "/health":
-            self._handle_health()
-        elif path == "/status":
-            self._handle_status()
         else:
-            self.send_response(404)
-            self.end_headers()
-            self.wfile.write(b'{"error": "not found"}')
+            self._handle_404()
+
+    # ── Agent 上报 ───────────────────────────────────────
 
     def _handle_report(self):
         try:
@@ -39,13 +55,9 @@ class VigilHandler(BaseHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body)
 
-            # Token 验证
             if VigilHandler.expected_token:
                 if data.get("token") != VigilHandler.expected_token:
-                    self.send_response(401)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(b'{"error": "invalid token"}')
+                    self._json_response(401, {"error": "invalid token"})
                     return
 
             hostname = data.get("hostname", "unknown")
@@ -54,110 +66,201 @@ class VigilHandler(BaseHTTPRequestHandler):
 
             if data_type == "offline":
                 self.storage.mark_offline(hostname)
-                logger.warning("Agent reported offline: %s", hostname)
+                logger.warning("Agent offline: %s", hostname)
             else:
                 self.storage.save_report(hostname, report_data)
                 if self.alert_engine and self.alert_callback:
-                    alerts = self.alert_engine.check_agent_report(hostname, report_data)
-                    for alert in alerts:
+                    for alert in self.alert_engine.check_agent_report(hostname, report_data):
                         try:
                             self.alert_callback(alert)
                         except Exception as e:
                             logger.error("Alert push failed: %s", e)
 
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"status": "ok"}')
+            self._json_response(200, {"status": "ok"})
         except Exception as e:
-            logger.error("Report handler error: %s", e)
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode())
+            logger.error("Report error: %s", e)
+            self._json_response(500, {"error": str(e)})
+
+    # ── 健康检查 ─────────────────────────────────────────
 
     def _handle_health(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(b'{"status": "ok"}')
+        self._json_response(200, {"status": "ok", "service": "vigil"})
 
-    def _handle_status(self):
+    # ── Agent 状态（旧格式兼容？不用——这是Vigil自己的格式）──
+
+    def _handle_agent_status(self):
+        """返回所有 Agent 的状态（只有装了 Agent 的服务器才有数据）"""
         try:
-            # 合并 Agent 数据和 Pinger 数据
-            agent_records = self.storage.get_latest_all()
-            ping_records = self.storage.get_ping_latest_all()
-            ping_map = {r["hostname"]: r["data"] for r in ping_records if r.get("data")}
-
+            records = self.storage.get_latest_all()
             result = []
-            for record in agent_records:
-                data = record.get("data", {})
-                system = data.get("system", {})
+            for r in records:
+                data = r.get("data", {})
                 cpu = data.get("cpu", {})
-                memory = data.get("memory", {})
-                hostname = record["hostname"]
-
-                item = {
-                    "hostname": hostname,
-                    "source": "agent",
-                    "is_offline": bool(record["is_offline"]),
-                    "last_seen": record["last_seen"],
-                    "uptime": system.get("uptime_sec", 0),
+                mem = data.get("memory", {})
+                sys = data.get("system", {})
+                result.append({
+                    "hostname": r["hostname"],
+                    "is_offline": bool(r["is_offline"]),
+                    "last_seen": r["last_seen"],
                     "cpu_percent": round(cpu.get("percent", 0), 1),
-                    "memory_percent": round(memory.get("percent", 0), 1),
+                    "memory_percent": round(mem.get("percent", 0), 1),
+                    "uptime": sys.get("uptime_sec", 0),
                     "load": {
                         "1m": cpu.get("load_1", 0),
                         "5m": cpu.get("load_5", 0),
                         "15m": cpu.get("load_15", 0),
                     },
+                })
+            self._json_response(200, result)
+        except Exception as e:
+            logger.error("Status error: %s", e)
+            self._json_response(500, {"error": str(e)})
+
+    # ── Vigil 统一 API ──────────────────────────────────
+
+    def _handle_api_servers(self):
+        """统一服务器状态 API — 合并 ping + Agent 数据"""
+        try:
+            ping_data = self.storage.get_ping_latest_all() if self.storage else []
+            agent_data = self.storage.get_latest_all() if self.storage else []
+
+            # 建索引
+            ping_map = {r["hostname"]: r for r in ping_data}
+            agent_map = {r["hostname"]: r for r in agent_data}
+
+            # 从 pinger 取服务器列表
+            all_hostnames = []
+            if self.pinger:
+                all_hostnames = [s["name"] for s in self.pinger.get_servers()]
+
+            # 也加上有 Agent 数据的
+            for h in agent_map:
+                if h not in all_hostnames:
+                    all_hostnames.append(h)
+
+            result = []
+            for hostname in all_hostnames:
+                p = ping_map.get(hostname, {})
+                a = agent_map.get(hostname, {})
+                a_data = a.get("data", {}) if a else {}
+
+                is_offline = False
+                if p:
+                    is_offline = not bool(p.get("last_ok", 0))
+                elif a:
+                    is_offline = bool(a.get("is_offline", False))
+
+                item = {
+                    "hostname": hostname,
+                    "online": not is_offline,
+                    "rtt": round(p.get("rtt", 0), 1) if p else None,
+                    "loss_pct": round(p.get("loss_pct", 0), 1) if p else None,
+                    "last_ping": p.get("updated_at", 0) if p else 0,
+                    "cpu_percent": round(
+                        a_data.get("cpu", {}).get("percent", 0), 1
+                    ) if a_data else None,
+                    "memory_percent": round(
+                        a_data.get("memory", {}).get("percent", 0), 1
+                    ) if a_data else None,
+                    "disks": a_data.get("disks", []) if a_data else [],
+                    "uptime": a_data.get("system", {}).get("uptime_sec", 0) if a_data else 0,
                 }
-
-                # 合并 Pinger 数据
-                if hostname in ping_map:
-                    pinger_data = ping_map[hostname].get("pinger", {})
-                    item["rtt"] = pinger_data.get("rtt", 0)
-                    item["loss_pct"] = pinger_data.get("loss_pct", 0)
-
                 result.append(item)
 
-            # 只有 Pinger 数据但没有 Agent 数据的服务器
-            for r in ping_records:
-                hostname = r["hostname"]
-                if hostname not in {x["hostname"] for x in result}:
-                    pinger_data = r.get("data", {}).get("pinger", {})
-                    result.append({
-                        "hostname": hostname,
-                        "source": "pinger",
-                        "is_offline": bool(r.get("is_offline", False)),
-                        "last_seen": r["last_seen"],
-                        "uptime": 0,
-                        "cpu_percent": 0,
-                        "memory_percent": 0,
-                        "load": {"1m": 0, "5m": 0, "15m": 0},
-                        "rtt": pinger_data.get("rtt", 0),
-                        "loss_pct": pinger_data.get("loss_pct", 0),
-                    })
-
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(json.dumps(result, ensure_ascii=False).encode())
+            self._json_response(200, result)
         except Exception as e:
-            logger.error("Status handler error: %s", e)
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode())
+            logger.error("API servers error: %s", e)
+            self._json_response(500, {"error": str(e)})
+
+    def _handle_api_server(self, hostname: str):
+        """单台服务器详情"""
+        try:
+            ping_data = self.storage.get_ping_latest(hostname) if self.storage else None
+            agent_data = self.storage.get_latest(hostname) if self.storage else None
+
+            result = {"hostname": hostname, "online": True}
+
+            if ping_data:
+                result["ping"] = {
+                    "rtt": round(ping_data.get("rtt", 0), 1),
+                    "min_rtt": round(ping_data.get("min_rtt", 0), 1),
+                    "max_rtt": round(ping_data.get("max_rtt", 0), 1),
+                    "loss_pct": round(ping_data.get("loss_pct", 0), 1),
+                    "last_ok": bool(ping_data.get("last_ok", 0)),
+                    "updated_at": ping_data.get("updated_at", 0),
+                }
+                if not ping_data.get("last_ok", 0):
+                    result["online"] = False
+
+            if agent_data:
+                ad = agent_data.get("data", {})
+                result["agent"] = {
+                    "cpu": ad.get("cpu", {}),
+                    "memory": ad.get("memory", {}),
+                    "disks": ad.get("disks", []),
+                    "network": ad.get("network", []),
+                    "system": ad.get("system", {}),
+                    "last_seen": agent_data.get("last_seen", 0),
+                }
+
+            self._json_response(200, result)
+        except Exception as e:
+            logger.error("API server error: %s", e)
+            self._json_response(500, {"error": str(e)})
+
+    def _handle_api_ping(self, hostname: str):
+        """原始 ping 数据序列（兼容旧 /live 用途）"""
+        try:
+            # 先从 pinger 内存缓存读（快速）
+            entries = []
+            if self.pinger:
+                entries = self.pinger.get_recent(hostname, 120)
+            else:
+                # 从数据库读
+                parts = urlparse(self.path).query
+                n = 60
+                if parts:
+                    for q in parts.split("&"):
+                        if q.startswith("n="):
+                            try:
+                                n = int(q[2:])
+                            except ValueError:
+                                pass
+                raw = self.storage.get_ping_raw(hostname, n) if self.storage else []
+                entries = [{"ts": r["ts"], "rtt": r["rtt"], "ok": bool(r["ok"])} for r in raw]
+
+            self._json_response(200, {
+                "server": hostname,
+                "data": entries,
+            })
+        except Exception as e:
+            logger.error("API ping error: %s", e)
+            self._json_response(500, {"error": str(e)})
+
+    # ── 工具 ─────────────────────────────────────────────
+
+    def _handle_404(self):
+        self._json_response(404, {"error": "not found"})
+
+    def _json_response(self, code, data):
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(json.dumps(data, ensure_ascii=False).encode())
 
     def log_message(self, fmt, *args):
         logger.debug("HTTP %s", fmt % args)
 
 
 def start_vigil_server(host, port, storage, alert_engine, alert_callback,
-                       token=None, certfile=None, keyfile=None):
+                       token=None, certfile=None, keyfile=None, pinger=None):
+    """启动 Vigil HTTP 服务"""
     VigilHandler.storage = storage
     VigilHandler.alert_engine = alert_engine
     VigilHandler.alert_callback = alert_callback
     VigilHandler.expected_token = token
+    VigilHandler.pinger = pinger
 
     server = HTTPServer((host, port), VigilHandler)
 
@@ -169,25 +272,26 @@ def start_vigil_server(host, port, storage, alert_engine, alert_callback,
     else:
         proto = "HTTP"
 
-    logger.info("Vigil receiver started: %s://%s:%s (token: %s)",
-                proto, host, port, "enabled" if token else "disabled")
+    logger.info("Vigil server started: %s://%s:%s (token: %s, pinger: %s)",
+                proto, host, port, "enabled" if token else "disabled",
+                "attached" if pinger else "none")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        logger.info("Vigil receiver stopped")
+        logger.info("Vigil server stopped")
         server.server_close()
 
 
 def start_offline_checker(storage, alert_engine, alert_callback, check_interval=60):
-    """后台守护线程：定期检查离线服务器并触发告警"""
+    """后台守护线程：定期检查离线服务器"""
     def _checker():
         while True:
             try:
-                records = storage.get_latest_all()
+                records = storage.get_latest_all() if storage else []
                 for record in records:
                     if not record.get("is_offline", False):
-                        alerts = alert_engine.check_offline(record["hostname"], record["last_seen"])
-                        for alert in alerts:
+                        for alert in alert_engine.check_offline(
+                                record["hostname"], record["last_seen"]):
                             try:
                                 alert_callback(alert)
                             except Exception as e:
