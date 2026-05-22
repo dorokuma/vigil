@@ -8,6 +8,8 @@ import os
 import sys
 import threading
 
+import httpx  # 用于异步推送告警到 Cloudflare Dashboard
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from storage import VigilStorage
