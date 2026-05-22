@@ -167,8 +167,8 @@ Bot 包含以下功能：
 git clone https://github.com/dorokuma/vigil.git
 cd vigil/deploy
 
-# 2. 生成自签名证书（或使用真实证书）
-./generate-selfsigned-cert.sh your-server-ip-or-domain
+# 2. 生成自签名证书（或使用你自己的）
+deploy/generate-selfsigned-cert.sh your-server-ip-or-domain
 
 # 3. 创建你的集成脚本（your-bot.py）
 #    参考 bot-ext/ 目录里的 receiver.py、storage.py、alerts.py

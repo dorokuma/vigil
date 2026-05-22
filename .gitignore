@@ -46,6 +46,10 @@ venv/
 .env
 *.egg-info/
 
+# Vigil runtime (don't commit real config or data)
+bot/config.py
+vigil.db
+
 # IDE
 .vscode/
 .idea/

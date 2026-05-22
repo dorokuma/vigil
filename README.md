@@ -168,7 +168,7 @@ git clone https://github.com/dorokuma/vigil.git
 cd vigil/deploy
 
 # 2. Generate self-signed certificate (or bring your own)
-./generate-selfsigned-cert.sh your-server-ip-or-domain
+deploy/generate-selfsigned-cert.sh your-server-ip-or-domain
 
 # 3. Create your integration script (your-bot.py)
 #    See bot-ext/ for receiver.py, storage.py, alerts.py
