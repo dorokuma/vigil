@@ -144,8 +144,15 @@ class VigilHandler(BaseHTTPRequestHandler):
                 a = agent_map.get(hostname, {})
                 a_data = a.get("data", {}) if a else {}
 
+                # 在线判断：取最近 6 次 ping（1 分钟窗口），连续失败 >= 3 才算离线
+                # 避免单次网络抖动导致频繁闪烁
                 is_offline = False
-                if p:
+                if self.pinger:
+                    recent = self.pinger.get_recent(hostname, 6)
+                    if recent:
+                        fails = sum(1 for r in recent if not r["ok"])
+                        is_offline = fails >= 3
+                elif p:
                     is_offline = not bool(p.get("last_ok", 0))
                 elif a:
                     is_offline = bool(a.get("is_offline", False))
@@ -189,8 +196,15 @@ class VigilHandler(BaseHTTPRequestHandler):
                     "last_ok": bool(ping_data.get("last_ok", 0)),
                     "updated_at": ping_data.get("updated_at", 0),
                 }
-                if not ping_data.get("last_ok", 0):
-                    result["online"] = False
+
+            # 在线判断：取最近 6 次 ping（1 分钟窗口），连续失败 >= 3 才算离线
+            if self.pinger:
+                recent = self.pinger.get_recent(hostname, 6)
+                if recent:
+                    fails = sum(1 for r in recent if not r["ok"])
+                    result["online"] = not (fails >= 3)
+            elif ping_data:
+                result["online"] = bool(ping_data.get("last_ok", 0))
 
             if agent_data:
                 ad = agent_data.get("data", {})
