@@ -19,6 +19,7 @@ DB_PATH = "vigil.db"
 PING_HOSTS = {
     # "my-server-1": "192.168.1.1",
     # "my-server-2": "monitor.example.com",
+    # "my-server-3": "dynamic-dns.example.com",
 }
 
 # Ping 间隔（秒）
