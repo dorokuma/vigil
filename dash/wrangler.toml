@@ -2,9 +2,9 @@ name = "dash"
 pages_build_output_dir = "./dist"
 compatibility_date = "2026-05-21"
 
-# 告警历史持久化（推荐绑定 KV，免费额度足够）
-# [kv_namespaces]
-# ALERTS = { binding = "ALERTS_KV", id = "your-kv-id" }
+# 默认启用 Cloudflare KV 持久化告警历史（免费额度足够）
+[kv_namespaces]
+ALERTS = { binding = "ALERTS_KV", id = "your-kv-namespace-id-here" }  # 部署前请替换为真实 KV ID
 
 [env.production]
 name = "dash"
