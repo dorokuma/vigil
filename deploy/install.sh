@@ -1,15 +1,17 @@
 #!/bin/bash
 set -e
 if [ $# -lt 2 ]; then
-    echo "Usage: bash install.sh <arch> <hostname> [server_url]"
+    echo "Usage: bash install.sh <arch> <hostname> [server_url] [token]"
     echo "  arch: amd64 | arm64"
     echo "  hostname: unique name for this server"
     echo "  server_url: default http://your-server:9901"
+    echo "  token: optional, set same value in collector config for auth"
     exit 1
 fi
 ARCH=$1
 HOSTNAME=$2
 SERVER_URL=${3:-"http://your-server:9901"}
+TOKEN=${4:-""}
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BINARY="$SCRIPT_DIR/vigil-agent-linux-$ARCH"
 
@@ -28,7 +30,7 @@ cat > /etc/vigil/config.json << CONFIGEOF
 {
     "server_url": "$SERVER_URL",
     "interval": 30,
-    "hostname": "$HOSTNAME"
+    "hostname": "$HOSTNAME"$(if [ -n "$TOKEN" ]; then echo ","; echo '    "token": "'$TOKEN'"'; fi)
 }
 CONFIGEOF
 cp "$SCRIPT_DIR/vigil-agent.service" /etc/systemd/system/vigil-agent.service
