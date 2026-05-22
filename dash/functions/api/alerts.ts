@@ -1,4 +1,6 @@
-export interface Env {}
+export interface Env {
+  ALERTS_KV?: KVNamespace;
+}
 
 interface Alert {
   id: number;
@@ -10,10 +12,24 @@ interface Alert {
   timestamp: number;
 }
 
-// 注意：当前使用内存存储，部署后会重置。
-// 生产环境建议绑定 Cloudflare KV（免费额度足够）：
-// 在 wrangler.toml 中添加 [kv_namespaces] 并修改代码使用 env.ALERTS_KV
-let alertHistory: Alert[] = [];
+const ALERT_KEY = 'vigil_alerts';
+
+const getAlerts = async (env: Env): Promise<Alert[]> => {
+  if (env.ALERTS_KV) {
+    const data = await env.ALERTS_KV.get(ALERT_KEY, 'json');
+    return data || [];
+  }
+  // 内存回退（仅开发环境）
+  return (globalThis as any).__vigil_alerts || [];
+};
+
+const saveAlerts = async (env: Env, alerts: Alert[]) => {
+  if (env.ALERTS_KV) {
+    await env.ALERTS_KV.put(ALERT_KEY, JSON.stringify(alerts));
+  } else {
+    (globalThis as any).__vigil_alerts = alerts;
+  }
+};
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -30,8 +46,10 @@ export default {
           timestamp: Date.now(),
         };
 
-        alertHistory.unshift(newAlert);
-        if (alertHistory.length > 50) alertHistory.pop();
+        const alerts = await getAlerts(env);
+        alerts.unshift(newAlert);
+        if (alerts.length > 50) alerts.pop();
+        await saveAlerts(env, alerts);
 
         return new Response(JSON.stringify({ success: true }), {
           headers: { 'Content-Type': 'application/json' },
@@ -42,7 +60,8 @@ export default {
     }
 
     if (request.method === 'GET' && url.pathname === '/api/alerts') {
-      return new Response(JSON.stringify(alertHistory), {
+      const alerts = await getAlerts(env);
+      return new Response(JSON.stringify(alerts), {
         headers: { 
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
