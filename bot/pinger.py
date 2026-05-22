@@ -74,7 +74,9 @@ class Pinger:
         use_ping6 = ":" in address
 
         try:
-            cmd = ["ping6" if use_ping6 else "ping", "-c", "1"]
+            cmd = ["ping", "-c", "1"]
+            if use_ping6:
+                cmd.append("-6")
             if not use_ping6:
                 cmd += ["-W", "5"]
             cmd.append(address)

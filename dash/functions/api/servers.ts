@@ -61,7 +61,7 @@ export default {
       }
 
       try {
-        const apiUrl = env.VIGIL_API_URL || 'http://127.0.0.1:9901/status';
+        const apiUrl = env.VIGIL_API_URL || 'http://127.0.0.1:9901/api/servers';
         const originResponse = await fetch(apiUrl, {
           cf: { cacheTtl: 15, cacheEverything: true }
         });
@@ -72,7 +72,7 @@ export default {
           .map((server) => ({
             name: server.hostname,
             location: LOCATION_MAP[server.hostname] || server.hostname,
-            online: !server.is_offline,
+            online: server.online !== false,
             latency: Math.round(server.rtt || 0),
             packetLoss: server.loss_pct || 0,
             uptime: formatUptime(server.uptime),

@@ -7,16 +7,13 @@ services:
     ports:
       - "9901:9901"
     volumes:
-      - ./bot-ext:/app/bot-ext:ro
-      - ./your-bot.py:/app/your-bot.py   # <-- put your Telegram bot integration script here
-      - ./fullchain.pem:/app/fullchain.pem:ro
-      - ./privkey.pem:/app/privkey.pem:ro
+      - ./bot:/app/bot:ro
       - ./vigil.db:/app/vigil.db
     working_dir: /app
     environment:
       - PYTHONUNBUFFERED=1
-      - TOKEN=super-secret-123   # change this!
-    command: python your-bot.py
+      - VIGIL_TOKEN=your-secret-token   # change this!
+    command: python -m bot.main
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9901/health"]
