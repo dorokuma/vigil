@@ -10,7 +10,9 @@ interface Alert {
   timestamp: number;
 }
 
-// 简单内存存储（生产建议改用 KV）
+// 注意：当前使用内存存储，部署后会重置。
+// 生产环境建议绑定 Cloudflare KV（免费额度足够）：
+// 在 wrangler.toml 中添加 [kv_namespaces] 并修改代码使用 env.ALERTS_KV
 let alertHistory: Alert[] = [];
 
 export default {
@@ -29,7 +31,7 @@ export default {
         };
 
         alertHistory.unshift(newAlert);
-        if (alertHistory.length > 50) alertHistory.pop(); // 只保留最近50条
+        if (alertHistory.length > 50) alertHistory.pop();
 
         return new Response(JSON.stringify({ success: true }), {
           headers: { 'Content-Type': 'application/json' },
