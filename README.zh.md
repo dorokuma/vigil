@@ -223,7 +223,25 @@ docker compose logs -f
    bash deploy/setup-cloudflare-tunnel.sh
    ```
 
-现在你拥有了一个**完整的免费全球监控系统**，包含实时仪表盘和告警历史！
+### 如何启用告警历史持久化（KV）
+
+默认情况下，告警历史使用 Cloudflare KV 进行持久化（生产环境推荐）。
+
+**启用步骤：**
+1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com) → Workers & Pages → KV
+2. 点击 "Create a namespace"，命名为 `vigil-alerts`
+3. 复制新 Namespace 的 **ID**
+4. 编辑 `dash/wrangler.toml`，替换占位符：
+   ```toml
+   [kv_namespaces]
+   ALERTS = { binding = "ALERTS_KV", id = "你的KV_ID" }
+   ```
+5. 重新部署 Dashboard：
+   ```bash
+   cd dash && npm run build && npx wrangler pages deploy dist
+   ```
+
+现在告警历史将永久保存在 Cloudflare KV 中（免费额度完全足够）。
 
 ## 采集指标 📊
 
