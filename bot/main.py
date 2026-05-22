@@ -1,7 +1,6 @@
 """
 Vigil Main — 采集端入口
 整合 Pinger + Storage + Alerts + HTTP API
-吸收旧 engine 全部能力
 """
 import asyncio
 import logging
@@ -29,11 +28,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger("vigil")
 
+# Cloudflare Dashboard 告警推送（可选）
+CF_ALERT_URL = getattr(cfg, "CF_ALERT_URL", os.environ.get("CF_ALERT_URL", ""))
+
+
+async def _push_alert_to_cf(alert: dict):
+    if not CF_ALERT_URL:
+        return
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(CF_ALERT_URL, json=alert, timeout=3)
+    except Exception as e:
+        logger.debug(f"推送 Cloudflare Dashboard 失败: {e}")
+
 
 def main():
     logger.info("=== Vigil Collector starting ===")
 
-    # ── 配置 ──
     db_path = getattr(cfg, "DB_PATH", os.environ.get("VIGIL_DB_PATH", "vigil.db"))
     host = getattr(cfg, "VIGIL_HOST", "0.0.0.0")
     port = getattr(cfg, "VIGIL_PORT", 9901)
@@ -49,17 +60,19 @@ def main():
         "cooldown": getattr(cfg, "ALERT_COOLDOWN", 300),
     }
 
-    # ── 初始化组件 ──
     storage = VigilStorage(db_path)
     alert_engine = VigilAlertEngine(alert_config)
 
-    # 告警回调
+    # 告警回调（日志 + 异步推送到 Cloudflare Dashboard）
     def alert_callback(alert):
         icon = "\U0001f6a8" if alert["severity"] == "critical" else "\u26a0\ufe0f"
-        logger.warning("%s [%s] %s: %s", icon, alert["type"],
-                       alert["hostname"], alert["message"])
+        logger.warning("%s [%s] %s: %s", icon, alert["type"], alert["hostname"], alert["message"])
 
-    # ── 启动 Pinger（吸收旧 engine 的 ping 能力）──
+        # 异步推送到 Cloudflare Dashboard（不阻塞主流程）
+        if CF_ALERT_URL:
+            asyncio.create_task(_push_alert_to_cf(alert))
+
+    # Pinger
     ping_hosts = getattr(cfg, "PING_HOSTS", {})
     ping_interval = getattr(cfg, "PING_INTERVAL", 10)
     ping_timeout = getattr(cfg, "PING_TIMEOUT", 5)
@@ -68,19 +81,14 @@ def main():
 
     async def run_pinger_async():
         await pinger.start()
-        try:
-            await pinger._task
-        except asyncio.CancelledError:
-            pass
 
     def run_pinger():
         asyncio.run(run_pinger_async())
 
     pinger_thread = threading.Thread(target=run_pinger, daemon=True, name="vigil-pinger")
     pinger_thread.start()
-    logger.info("Pinger thread started")
 
-    # ── 启动 HTTP 服务 ──
+    # HTTP 服务
     http_thread = threading.Thread(
         target=start_vigil_server,
         args=(host, port, storage, alert_engine, alert_callback),
@@ -90,7 +98,6 @@ def main():
     )
     http_thread.start()
 
-    # ── 启动离线检查 ──
     start_offline_checker(storage, alert_engine, alert_callback, 60)
 
     logger.info("=== Vigil Collector is running ===")
@@ -99,7 +106,6 @@ def main():
     logger.info("  DB: %s", db_path)
     logger.info("  Token: %s", "enabled" if token else "disabled")
 
-    # 保持主线程存活
     try:
         while True:
             import time
