@@ -98,6 +98,9 @@ export function ServersTable({ data, isLoading }: ServersTableProps) {
       header: '延迟',
       cell: info => {
         const v = info.getValue();
+        if (typeof v === 'string') {
+          return <span className="text-xs text-gray-400 font-medium">{v}</span>;
+        }
         const color = v < 50 ? 'text-emerald-500' : v < 150 ? 'text-amber-500' : 'text-red-500';
         return <span className={`text-xs tabular-nums font-medium ${color}`}>{v}ms</span>;
       },

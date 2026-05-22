@@ -2,7 +2,7 @@ export interface EnrichedServer {
   name: string;
   location: string;
   online: boolean;
-  latency: number;
+  latency: number | string;
   packetLoss: number;
   uptime: string;
   cpu: number;

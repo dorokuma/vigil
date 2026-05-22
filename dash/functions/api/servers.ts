@@ -1,13 +1,12 @@
 interface VigilServerData {
   hostname: string;
-  is_offline: boolean;
-  last_seen: number;
-  uptime: number;
-  cpu_percent: number;
-  memory_percent: number;
-  load: { "1m": number; "5m": number; "15m": number };
-  rtt?: number;
+  online: boolean;
+  rtt?: number | string;
   loss_pct?: number;
+  last_ping: number;
+  cpu_percent?: number;
+  memory_percent?: number;
+  uptime: number;
   disks?: { mount_point: string; percent: number }[];
 }
 
@@ -15,7 +14,7 @@ interface EnrichedServer {
   name: string;
   location: string;
   online: boolean;
-  latency: number;
+  latency: number | string;
   packetLoss: number;
   uptime: string;
   cpu: number;
@@ -69,7 +68,7 @@ export async function onRequest(context: { request: Request; env: { VIGIL_API_UR
           name: server.hostname,
           location: LOCATION_MAP[server.hostname] || server.hostname,
           online: server.online !== false,
-          latency: Math.round(server.rtt || 0),
+          latency: typeof server.rtt === 'string' ? server.rtt : Math.round(server.rtt || 0),
           packetLoss: server.loss_pct || 0,
           uptime: formatUptime(server.uptime),
           cpu: Math.round(server.cpu_percent || 0),
