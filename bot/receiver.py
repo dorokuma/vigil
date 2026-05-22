@@ -160,7 +160,10 @@ class VigilHandler(BaseHTTPRequestHandler):
                 item = {
                     "hostname": hostname,
                     "online": not is_offline,
-                    "rtt": "本机" if (VigilHandler.local_hostname and hostname == VigilHandler.local_hostname) else (round(p["rtt"], 1) if (p and p.get("last_ok")) else None),
+                    "rtt": "本机" if (VigilHandler.local_hostname and hostname == VigilHandler.local_hostname) else (
+                        "网络波动" if (p and p.get("last_ok") is not None and not p.get("last_ok")) else (
+                        round(p["rtt"], 1) if (p and p.get("last_ok")) else None
+                    )),
                     "loss_pct": round(p["loss_pct"], 1) if (p and p.get("last_ok")) else None,
                     "last_ping": p.get("updated_at", 0) if p else 0,
                     "cpu_percent": round(
@@ -193,6 +196,8 @@ class VigilHandler(BaseHTTPRequestHandler):
                     rtt_val = "本机"
                 elif last_ok and ping_data.get("rtt", 0) > 0:
                     rtt_val = round(ping_data["rtt"], 1)
+                elif ping_data.get("last_ok") is not None:
+                    rtt_val = "网络波动"
                 else:
                     rtt_val = None
                 result["ping"] = {
