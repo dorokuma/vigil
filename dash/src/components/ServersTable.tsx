@@ -98,11 +98,15 @@ export function ServersTable({ data, isLoading }: ServersTableProps) {
       header: '延迟',
       cell: info => {
         const v = info.getValue();
+        if (v === null || v === undefined) {
+          return <span className="text-xs text-gray-400">-</span>;
+        }
         if (typeof v === 'string') {
           return <span className="text-xs text-gray-400 font-medium">{v}</span>;
         }
-        const color = v < 50 ? 'text-emerald-500' : v < 150 ? 'text-amber-500' : 'text-red-500';
-        return <span className={`text-xs tabular-nums font-medium ${color}`}>{v}ms</span>;
+        const num = v as number;
+        const color = num < 50 ? 'text-emerald-500' : num < 150 ? 'text-amber-500' : 'text-red-500';
+        return <span className={`text-xs tabular-nums font-medium ${color}`}>{num}ms</span>;
       },
     }),
     columnHelper.accessor('uptime', {

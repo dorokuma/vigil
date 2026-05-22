@@ -68,7 +68,7 @@ export async function onRequest(context: { request: Request; env: { VIGIL_API_UR
           name: server.hostname,
           location: LOCATION_MAP[server.hostname] || server.hostname,
           online: server.online !== false,
-          latency: typeof server.rtt === 'string' ? server.rtt : Math.round(server.rtt || 0),
+          latency: typeof server.rtt === 'string' ? server.rtt : (server.rtt != null ? Math.round(server.rtt) : null),
           packetLoss: server.loss_pct || 0,
           uptime: formatUptime(server.uptime),
           cpu: Math.round(server.cpu_percent || 0),
