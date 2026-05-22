@@ -2,5 +2,9 @@ name = "dash"
 pages_build_output_dir = "./dist"
 compatibility_date = "2026-05-21"
 
+# 告警历史持久化（推荐绑定 KV，免费额度足够）
+# [kv_namespaces]
+# ALERTS = { binding = "ALERTS_KV", id = "your-kv-id" }
+
 [env.production]
 name = "dash"
