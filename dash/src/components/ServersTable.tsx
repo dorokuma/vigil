@@ -28,10 +28,7 @@ export function ServersTable({ data, isLoading }: ServersTableProps) {
       cell: info => (
         <div className="font-medium text-gray-800 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-          <span className="truncate">{info.getValue()}</span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-normal hidden sm:inline whitespace-nowrap">
-            {info.row.original.location}
-          </span>
+          <span>{info.row.original.location}</span>
         </div>
       ),
     }),
@@ -54,7 +51,7 @@ export function ServersTable({ data, isLoading }: ServersTableProps) {
       header: 'CPU',
       cell: info => (
         <div className="flex items-center gap-2">
-          <div className="w-16 sm:w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
+          <div className="w-11 sm:w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
             <div 
               className="h-full bg-gradient-to-r from-sky-400 to-blue-500 rounded-full transition-all" 
               style={{ width: `${Math.min(info.getValue(), 100)}%` }} 
@@ -68,7 +65,7 @@ export function ServersTable({ data, isLoading }: ServersTableProps) {
       header: '内存',
       cell: info => (
         <div className="flex items-center gap-2">
-          <div className="w-16 sm:w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
+          <div className="w-11 sm:w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
             <div 
               className="h-full bg-gradient-to-r from-teal-400 to-emerald-500 rounded-full transition-all" 
               style={{ width: `${Math.min(info.getValue(), 100)}%` }} 
@@ -82,7 +79,7 @@ export function ServersTable({ data, isLoading }: ServersTableProps) {
       header: '磁盘',
       cell: info => (
         <div className="flex items-center gap-2">
-          <div className="w-16 sm:w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
+          <div className="w-11 sm:w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
             <div 
               className={`h-full rounded-full transition-all ${
                 info.getValue() > 90 ? 'bg-red-400' : info.getValue() > 70 ? 'bg-amber-400' : 'bg-violet-400'
