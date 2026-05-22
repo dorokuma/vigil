@@ -145,21 +145,25 @@ class VigilHandler(BaseHTTPRequestHandler):
                 a = agent_map.get(hostname, {})
                 a_data = a.get("data", {}) if a else {}
 
-                # 在线判断：Pinger + Agent 融合
+                # 在线判断
                 is_offline = False
+                in_ping_list = False
                 if self.pinger:
+                    ping_hostnames = [s["name"] for s in self.pinger.get_servers()]
+                    in_ping_list = hostname in ping_hostnames
                     recent = self.pinger.get_recent(hostname, 6)
                     if recent:
                         fails = sum(1 for r in recent if not r["ok"])
                         is_offline = fails >= 3
-                # Agent 正常上报说明机器活着，覆盖 Pinger 误判
-                if a and not a.get("is_offline", False):
-                    is_offline = False
-                elif not self.pinger and not a:
-                    if p:
-                        is_offline = not bool(p.get("last_ok", 0))
-                elif a:
-                    is_offline = bool(a.get("is_offline", False))
+                    elif in_ping_list:
+                        # 在 PING_HOSTS 里但 Pinger 拿不到数据 → offline
+                        is_offline = True
+
+                # 不在 PING_HOSTS 里的服务器，靠 Agent 判断
+                if not in_ping_list:
+                    if a:
+                        is_offline = bool(a.get("is_offline", False))
+                    # 既不在 ping 列表也无 agent → 保持 default False
 
                 item = {
                     "hostname": hostname,
