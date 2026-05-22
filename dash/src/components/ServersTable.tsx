@@ -95,18 +95,15 @@ export function ServersTable({ data, isLoading }: ServersTableProps) {
       ),
     }),
     columnHelper.accessor('latency', {
-      header: '延迟',
+      header: () => <span className="min-w-[5rem] block whitespace-nowrap">延迟</span>,
       cell: info => {
         const v = info.getValue();
-        if (v === null || v === undefined) {
-          return <span className="text-xs text-gray-400">-</span>;
-        }
         if (typeof v === 'string') {
-          return <span className="text-xs text-gray-400 font-medium">{v}</span>;
+          return <span className="text-xs text-gray-400 font-medium whitespace-nowrap">{v}</span>;
         }
         const num = v as number;
         const color = num < 50 ? 'text-emerald-500' : num < 150 ? 'text-amber-500' : 'text-red-500';
-        return <span className={`text-xs tabular-nums font-medium ${color}`}>{num}ms</span>;
+        return <span className={`text-xs tabular-nums font-medium whitespace-nowrap ${color}`}>{num}ms</span>;
       },
     }),
     columnHelper.accessor('uptime', {
