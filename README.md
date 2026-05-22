@@ -223,7 +223,25 @@ See `deploy/docker-compose.yml` for the full example (includes healthcheck, volu
    bash deploy/setup-cloudflare-tunnel.sh
    ```
 
-Now you have a **complete free global monitoring system** with real-time dashboard and alert history!
+### How to Enable Persistent Alert History (KV)
+
+By default, alert history uses Cloudflare KV for persistence (recommended for production).
+
+**Steps to enable:**
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com) → Workers & Pages → KV
+2. Click "Create a namespace" → Name it `vigil-alerts`
+3. Copy the **ID** of the new namespace
+4. Edit `dash/wrangler.toml` and replace the placeholder:
+   ```toml
+   [kv_namespaces]
+   ALERTS = { binding = "ALERTS_KV", id = "your-kv-namespace-id-here" }
+   ```
+5. Redeploy the dashboard:
+   ```bash
+   cd dash && npm run build && npx wrangler pages deploy dist
+   ```
+
+Now alert history will be permanently stored in Cloudflare KV (free tier is more than enough).
 
 ## Metrics
 
