@@ -13,6 +13,20 @@ VIGIL_PORT = 9901
 # ==== 数据库 ====
 DB_PATH = "vigil.db"
 
+# ==== Pinger（延迟检测）====
+# 要 ping 的服务器列表
+# 部署前替换为真实的目标服务器 IP/域名
+PING_HOSTS = {
+    # "my-server-1": "192.168.1.1",
+    # "my-server-2": "monitor.example.com",
+}
+
+# Ping 间隔（秒）
+PING_INTERVAL = 10
+
+# Ping 超时（秒）
+PING_TIMEOUT = 5
+
 # ==== 告警阈值 ====
 ALERT_CPU = 80.0       # CPU 使用率超过此值告警
 ALERT_MEMORY = 85.0    # 内存使用率超过此值告警

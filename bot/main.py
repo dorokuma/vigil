@@ -60,7 +60,11 @@ def main():
                        alert["hostname"], alert["message"])
 
     # ── 启动 Pinger（吸收旧 engine 的 ping 能力）──
-    pinger = Pinger(storage=storage)
+    ping_hosts = getattr(cfg, "PING_HOSTS", {})
+    ping_interval = getattr(cfg, "PING_INTERVAL", 10)
+    ping_timeout = getattr(cfg, "PING_TIMEOUT", 5)
+
+    pinger = Pinger(hosts=ping_hosts, storage=storage)
 
     def run_pinger():
         asyncio.run(pinger.start())

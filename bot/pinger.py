@@ -3,6 +3,8 @@ Vigil - Pinger 升级版
 每 10 秒并发 ping 所有服务器
 结果写入 SQLite（ping_raw + ping_latest）
 每分钟聚合（ping_history）
+
+注意: 服务器列表从 config.py 的 PING_HOSTS 读取，不在代码中硬编码
 """
 import asyncio
 import logging
@@ -11,32 +13,26 @@ import re
 
 logger = logging.getLogger(__name__)
 
-# 受监控服务器（继承自旧 engine 的能力，不是代码）
-SERVERS = [
-    {"name": "hongkong",  "address": "103.48.169.189"},
-    {"name": "tokyo",     "address": "158.179.184.242"},
-    {"name": "mumbai",    "address": "144.24.108.241"},
-    {"name": "sanjose",   "address": "2603:c024:c000:8e5e:91b:c01:e04e:390e"},
-    {"name": "columbus",  "address": "2603:c024:c000:8e5e:4d5c:2789:2bd8:668"},
-    {"name": "aione",     "address": "23.173.216.45"},
-    {"name": "singapore", "address": "2a12:bec0:16e:33f::"},
-]
-
 
 class Pinger:
     """Vigil 升级版 Pinger — 吸收旧 engine 的 ping 能力"""
 
-    def __init__(self, storage=None):
+    def __init__(self, hosts: dict, storage=None):
+        """
+        hosts: { "hostname": "ip_or_domain", ... } 来自 config.py 的 PING_HOSTS
+        storage: VigilStorage 实例
+        """
+        self.hosts = [{"name": k, "address": v} for k, v in hosts.items()]
         self.storage = storage
         self._running = False
         self._task = None
         # 内存缓存最近 120 条（用于 /api/ping/ 快速响应）
-        self.recent_cache = {s["name"]: [] for s in SERVERS}
+        self.recent_cache = {s["name"]: [] for s in self.hosts}
 
     async def start(self):
         self._running = True
         self._task = asyncio.create_task(self._run())
-        logger.info("Pinger started: %d servers every 10s", len(SERVERS))
+        logger.info("Pinger started: %d servers every 10s", len(self.hosts))
 
     async def stop(self):
         self._running = False
@@ -61,7 +57,7 @@ class Pinger:
                 last_agg = now
 
     async def _ping_all(self):
-        tasks = [self._ping_one(s) for s in SERVERS]
+        tasks = [self._ping_one(s) for s in self.hosts]
         await asyncio.gather(*tasks, return_exceptions=True)
 
     def _parse_rtt(self, output: str) -> tuple:
@@ -121,7 +117,7 @@ class Pinger:
             return
         now_ts = int(time.time())
 
-        for s in SERVERS:
+        for s in self.hosts:
             hostname = s["name"]
             raw = await self._get_raw_from_db(hostname, 6)
             if not raw:
@@ -167,4 +163,4 @@ class Pinger:
         return buf[-n:]
 
     def get_servers(self) -> list:
-        return SERVERS
+        return self.hosts
