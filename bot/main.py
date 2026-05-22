@@ -66,8 +66,15 @@ def main():
 
     pinger = Pinger(hosts=ping_hosts, storage=storage)
 
+    async def run_pinger_async():
+        await pinger.start()
+        try:
+            await pinger._task
+        except asyncio.CancelledError:
+            pass
+
     def run_pinger():
-        asyncio.run(pinger.start())
+        asyncio.run(run_pinger_async())
 
     pinger_thread = threading.Thread(target=run_pinger, daemon=True, name="vigil-pinger")
     pinger_thread.start()
