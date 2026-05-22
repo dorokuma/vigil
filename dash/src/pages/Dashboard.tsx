@@ -5,7 +5,7 @@ interface Server {
   name: string;
   location: string;
   online: boolean;
-  latency: number;
+  latency: number | string | null;
   packetLoss: number;
   uptime: string;
   cpu: number;
@@ -28,41 +28,23 @@ export default function Dashboard() {
   const avgCpu = servers.length 
     ? Math.round(servers.reduce((sum, s) => sum + s.cpu, 0) / servers.length) 
     : 0;
-  const avgLatency = servers.length
-    ? Math.round(servers.reduce((sum, s) => sum + (s.latency || 0), 0) / servers.length)
-    : 0;
+  const numericLatencies = servers
+    .map(s => s.latency)
+    .filter((v): v is number => typeof v === 'number' && !isNaN(v));
+  const avgLatency = numericLatencies.length
+    ? Math.round(numericLatencies.reduce((a, b) => a + b, 0) / numericLatencies.length)
+    : null;
 
   return (
     <div className="p-4 sm:p-8">
       <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
-        {/* Header: Logo + Stats */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <img src="/favicon.svg" alt="Vigil" className="w-10 h-10 sm:w-12 sm:h-12" />
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">Vigil</h1>
-          </div>
-          {/* Stats bar */}
-          <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto pb-1 sm:pb-0">
-            <div className="text-right shrink-0">
-              <div className="text-xs text-gray-400 font-medium uppercase tracking-wider">在线</div>
-              <div className="text-xl sm:text-2xl font-bold text-emerald-500 tabular-nums">
-                {onlineCount} <span className="text-sm text-gray-400">/ {servers.length}</span>
-              </div>
-            </div>
-            <div className="w-px h-8 bg-gray-200 shrink-0" />
-            <div className="text-right shrink-0">
-              <div className="text-xs text-gray-400 font-medium uppercase tracking-wider">平均 CPU</div>
-              <div className="text-xl sm:text-2xl font-bold text-sky-500 tabular-nums">{avgCpu}<span className="text-sm text-gray-400">%</span></div>
-            </div>
-            <div className="w-px h-8 bg-gray-200 shrink-0" />
-            <div className="text-right shrink-0">
-              <div className="text-xs text-gray-400 font-medium uppercase tracking-wider">平均延迟</div>
-              <div className="text-xl sm:text-2xl font-bold text-teal-500 tabular-nums">{avgLatency}<span className="text-sm text-gray-400">ms</span></div>
-            </div>
-          </div>
+        {/* Header: just logo */}
+        <div className="flex items-center gap-4">
+          <img src="/favicon.svg" alt="Vigil" className="w-10 h-10 sm:w-12 sm:h-12" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">Vigil</h1>
         </div>
 
-        {/* 统计卡片 */}
+        {/* Stat cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <div className="bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
             <div className="flex items-center gap-3">
@@ -94,18 +76,18 @@ export default function Dashboard() {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center shrink-0">
                 <svg className="w-5 h-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
               <div className="min-w-0">
-                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">更新频率</div>
-                <div className="text-xl font-bold text-gray-800">15s</div>
+                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">平均延迟</div>
+                <div className="text-xl font-bold text-gray-800">{avgLatency === null ? '-' : `${avgLatency}ms`}</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 服务器列表 */}
+        {/* Server table */}
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
             <h2 className="text-base sm:text-lg font-semibold text-gray-800">服务器列表</h2>
