@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200">
+  <defs>
+    <linearGradient id="gg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Stylized V chevron - also looks like an eye -->
+  <path d="M90 148 L120 38 L150 148" stroke="url(#gg)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M120 38 L145 148" stroke="url(#gg)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.2"/>
+  
+  <!-- Small accent dot on V top -->
+  <circle cx="120" cy="30" r="5" fill="url(#gg)"/>
+  
+  <!-- Main wordmark -->
+  <text x="195" y="118" font-family="system-ui, -apple-system, sans-serif" font-size="80" font-weight="700" fill="#0f172a" letter-spacing="-1">Vigil</text>
+  
+  <!-- Thin decorative underline -->
+  <line x1="195" y1="133" x2="410" y2="133" stroke="url(#gg)" stroke-width="2.5" stroke-linecap="round" opacity="0.35"/>
+</svg>

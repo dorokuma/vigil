@@ -35,20 +35,13 @@ export default function Dashboard() {
   return (
     <div className="p-4 sm:p-8">
       <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
-        {/* Mobile header */}
+        {/* Header: Logo + Stats */}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-sky-400 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg shadow-sky-200 shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">Vigil</h1>
-              <p className="text-sm text-gray-400">实时服务器监控</p>
-            </div>
+          <div className="flex items-center gap-4">
+            <img src="/favicon.svg" alt="Vigil" className="w-10 h-10 sm:w-12 sm:h-12" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">Vigil</h1>
           </div>
-          {/* Stats row - horizontal scroll on mobile */}
+          {/* Stats bar */}
           <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto pb-1 sm:pb-0">
             <div className="text-right shrink-0">
               <div className="text-xs text-gray-400 font-medium uppercase tracking-wider">在线</div>
@@ -69,7 +62,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Stat cards */}
+        {/* 统计卡片 */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <div className="bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
             <div className="flex items-center gap-3">
@@ -112,7 +105,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Server table */}
+        {/* 服务器列表 */}
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
             <h2 className="text-base sm:text-lg font-semibold text-gray-800">服务器列表</h2>
@@ -121,8 +114,12 @@ export default function Dashboard() {
           <ServersTable data={servers} isLoading={isLoading} />
         </div>
 
-        <div className="text-center text-xs text-gray-400 pt-4 pb-2">
-          Vigil · Cloudflare · 一路白嫖
+        {/* Footer */}
+        <div className="flex items-center justify-center gap-2 text-xs text-gray-400 pt-4 pb-2">
+          <span className="inline-block w-1 h-1 rounded-full bg-gray-300" />
+          Vigil
+          <span className="inline-block w-1 h-1 rounded-full bg-gray-300" />
+          Cloudflare 白嫖计划
         </div>
       </div>
     </div>
