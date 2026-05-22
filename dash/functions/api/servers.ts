@@ -1,7 +1,3 @@
-export interface Env {
-  VIGIL_API_URL: string;
-}
-
 interface VigilServerData {
   hostname: string;
   is_offline: boolean;
@@ -12,6 +8,7 @@ interface VigilServerData {
   load: { "1m": number; "5m": number; "15m": number };
   rtt?: number;
   loss_pct?: number;
+  disks?: { mount_point: string; percent: number }[];
 }
 
 interface EnrichedServer {
@@ -39,69 +36,65 @@ const LOCATION_MAP: Record<string, string> = {
 };
 
 function formatUptime(seconds: number): string {
-  if (seconds <= 0) return '—';
+  if (seconds <= 0) return '\u2014';
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   if (d > 0) return `${d}d ${h}h`;
   return `${h}h`;
 }
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
+export async function onRequest(context: { request: Request; env: { VIGIL_API_URL?: string } }) {
+  const { request, env } = context;
+  const url = new URL(request.url);
 
-    if (url.pathname === '/api/servers') {
-      const cacheKey = new Request('https://dash/api/servers', { method: 'GET' });
-      const cache = caches.default;
+  if (url.pathname === '/api/servers') {
+    const cacheKey = new Request('https://dash/api/servers', { method: 'GET' });
+    const cache = caches.default;
 
-      // 尝试从 Cloudflare Edge Cache 获取（白嫖 99% 请求）
-      let response = await cache.match(cacheKey);
-      if (response) {
-        return response;
-      }
-
-      try {
-        const apiUrl = env.VIGIL_API_URL || 'http://127.0.0.1:9901/api/servers';
-        const originResponse = await fetch(apiUrl, {
-          cf: { cacheTtl: 15, cacheEverything: true }
-        });
-        const rawData: VigilServerData[] = await originResponse.json();
-
-        const enriched: EnrichedServer[] = rawData
-          .filter((s) => s.hostname !== 'test-alert')
-          .map((server) => ({
-            name: server.hostname,
-            location: LOCATION_MAP[server.hostname] || server.hostname,
-            online: server.online !== false,
-            latency: Math.round(server.rtt || 0),
-            packetLoss: server.loss_pct || 0,
-            uptime: formatUptime(server.uptime),
-            cpu: Math.round(server.cpu_percent || 0),
-            memory: Math.round(server.memory_percent || 0),
-            disk: 0,
-          }));
-
-        const jsonResponse = new Response(JSON.stringify(enriched), {
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Cache-Control': 'public, max-age=20, s-maxage=30',
-            'CDN-Cache-Control': 'max-age=30',
-          },
-        });
-
-        // 写入 Cloudflare Edge Cache（免费且全球加速）
-        await cache.put(cacheKey, jsonResponse.clone());
-
-        return jsonResponse;
-      } catch (err) {
-        return new Response(JSON.stringify({ error: 'Failed to fetch server data' }), {
-          status: 502,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
+    let response = await cache.match(cacheKey);
+    if (response) {
+      return response;
     }
 
-    return new Response('Not Found', { status: 404 });
-  },
-} satisfies ExportedHandler<Env>;
+    try {
+      const apiUrl = env.VIGIL_API_URL || 'http://127.0.0.1:9901/api/servers';
+      const originResponse = await fetch(apiUrl, {
+        cf: { cacheTtl: 15, cacheEverything: true },
+      });
+      const rawData: VigilServerData[] = await originResponse.json();
+
+      const enriched: EnrichedServer[] = rawData
+        .filter((s) => s.hostname !== 'test-alert' && s.hostname !== 'test-tunnel')
+        .map((server) => ({
+          name: server.hostname,
+          location: LOCATION_MAP[server.hostname] || server.hostname,
+          online: server.online !== false,
+          latency: Math.round(server.rtt || 0),
+          packetLoss: server.loss_pct || 0,
+          uptime: formatUptime(server.uptime),
+          cpu: Math.round(server.cpu_percent || 0),
+          memory: Math.round(server.memory_percent || 0),
+          disk: Math.max(0, ...(server.disks || []).map(d => Math.round(d.percent))),
+        }));
+
+      const jsonResponse = new Response(JSON.stringify(enriched), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=20, s-maxage=30',
+          'CDN-Cache-Control': 'max-age=30',
+        },
+      });
+
+      await cache.put(cacheKey, jsonResponse.clone());
+      return jsonResponse;
+    } catch (err) {
+      return new Response(JSON.stringify({ error: 'Failed to fetch server data' }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
+  return new Response('Not Found', { status: 404 });
+}

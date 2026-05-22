@@ -25,7 +25,7 @@ export default function Alerts() {
     const demo = {
       hostname: ['hongkong', 'tokyo', 'beijing'][Math.floor(Math.random() * 3)],
       type: 'cpu_high',
-      severity: Math.random() > 0.5 ? 'warning' : 'critical',
+      severity: Math.random() > 0.5 ? 'warning' : 'critical' as const,
       message: '模拟告警 - ' + new Date().toLocaleTimeString(),
     };
     await fetch('/api/alerts', {
@@ -45,19 +45,19 @@ export default function Alerts() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">告警历史</h2>
-          <p className="text-sm text-zinc-500 mt-1">实时来自 Python Bot 的告警 · 每10秒刷新</p>
+          <h2 className="text-2xl font-semibold text-gray-800">告警历史</h2>
+          <p className="text-sm text-gray-400 mt-1">来自 Vigil Collector 的实时告警 · 每10秒刷新</p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={addDemoAlert}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm"
+            className="px-4 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-600 transition-all"
           >
             + 添加模拟告警
           </button>
           <button
             onClick={clearHistory}
-            className="px-4 py-2 bg-red-900/50 hover:bg-red-900 rounded-lg text-sm text-red-400"
+            className="px-4 py-2 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl text-sm text-red-500 transition-all"
           >
             清空历史
           </button>
@@ -65,9 +65,9 @@ export default function Alerts() {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-16 text-zinc-500">加载中...</div>
+        <div className="text-center py-16 text-gray-400">加载中...</div>
       ) : alerts.length === 0 ? (
-        <div className="text-center py-16 text-zinc-500">
+        <div className="text-center py-16 text-gray-400">
           暂无告警记录
         </div>
       ) : (
@@ -75,21 +75,29 @@ export default function Alerts() {
           {alerts.map((alert, index) => (
             <div
               key={alert.id}
-              className={`p-4 rounded-xl border flex justify-between items-start ${alert.severity === 'critical' 
-                ? 'border-red-500/50 bg-red-950/30' 
-                : 'border-yellow-500/50 bg-yellow-950/30'}`}
+              className={`p-4 rounded-xl border ${alert.severity === 'critical' 
+                ? 'border-red-200 bg-red-50/50' 
+                : 'border-amber-200 bg-amber-50/50'}`}
             >
-              <div>
-                <div className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 text-xs rounded ${alert.severity === 'critical' ? 'bg-red-500' : 'bg-yellow-500'} text-black font-medium`}>
-                    {alert.severity.toUpperCase()}
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <span className={`mt-0.5 px-2 py-0.5 text-xs rounded-full font-medium ${
+                    alert.severity === 'critical' 
+                      ? 'bg-red-100 text-red-600' 
+                      : 'bg-amber-100 text-amber-600'
+                  }`}>
+                    {alert.severity === 'critical' ? '严重' : '警告'}
                   </span>
-                  <span className="font-mono text-sm text-zinc-400">{alert.time}</span>
-                  <span className="font-medium">{alert.hostname}</span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400 font-mono">{alert.time}</span>
+                      <span className="text-sm font-medium text-gray-700">{alert.hostname}</span>
+                    </div>
+                    <div className="mt-0.5 text-sm text-gray-500">{alert.message}</div>
+                  </div>
                 </div>
-                <div className="mt-1 text-sm">{alert.message}</div>
+                <div className="text-xs text-gray-300">#{alerts.length - index}</div>
               </div>
-              <div className="text-xs text-zinc-500">#{alerts.length - index}</div>
             </div>
           ))}
         </div>

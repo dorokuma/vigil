@@ -21,55 +21,108 @@ export default function Dashboard() {
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     },
-    refetchInterval: 15000, // 每15秒自动刷新
+    refetchInterval: 15000,
   });
 
   const onlineCount = servers.filter(s => s.online).length;
   const avgCpu = servers.length 
     ? Math.round(servers.reduce((sum, s) => sum + s.cpu, 0) / servers.length) 
     : 0;
+  const avgLatency = servers.length
+    ? Math.round(servers.reduce((sum, s) => sum + (s.latency || 0), 0) / servers.length)
+    : 0;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex items-end justify-between">
-          <div>
-            <h1 className="text-4xl font-semibold tracking-tight">Vigil Dashboard</h1>
-            <p className="text-zinc-400 mt-1">实时服务器监控 · Powered by Cloudflare</p>
+    <div className="p-4 sm:p-8">
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        {/* Mobile header */}
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-sky-400 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg shadow-sky-200 shrink-0">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">Vigil</h1>
+              <p className="text-sm text-gray-400">实时服务器监控</p>
+            </div>
           </div>
-          <div className="text-right">
-            <div className="text-sm text-zinc-500">在线服务器</div>
-            <div className="text-3xl font-semibold tabular-nums text-green-400">
-              {onlineCount} / {servers.length}
+          {/* Stats row - horizontal scroll on mobile */}
+          <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto pb-1 sm:pb-0">
+            <div className="text-right shrink-0">
+              <div className="text-xs text-gray-400 font-medium uppercase tracking-wider">在线</div>
+              <div className="text-xl sm:text-2xl font-bold text-emerald-500 tabular-nums">
+                {onlineCount} <span className="text-sm text-gray-400">/ {servers.length}</span>
+              </div>
+            </div>
+            <div className="w-px h-8 bg-gray-200 shrink-0" />
+            <div className="text-right shrink-0">
+              <div className="text-xs text-gray-400 font-medium uppercase tracking-wider">平均 CPU</div>
+              <div className="text-xl sm:text-2xl font-bold text-sky-500 tabular-nums">{avgCpu}<span className="text-sm text-gray-400">%</span></div>
+            </div>
+            <div className="w-px h-8 bg-gray-200 shrink-0" />
+            <div className="text-right shrink-0">
+              <div className="text-xs text-gray-400 font-medium uppercase tracking-wider">平均延迟</div>
+              <div className="text-xl sm:text-2xl font-bold text-teal-500 tabular-nums">{avgLatency}<span className="text-sm text-gray-400">ms</span></div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-            <div className="text-sm text-zinc-500">平均 CPU</div>
-            <div className="text-5xl font-semibold tabular-nums mt-2">{avgCpu}<span className="text-2xl text-zinc-500">%</span></div>
+        {/* Stat cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">正常节点</div>
+                <div className="text-xl font-bold text-gray-800">{onlineCount} / {servers.length}</div>
+              </div>
+            </div>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-            <div className="text-sm text-zinc-500">总服务器</div>
-            <div className="text-5xl font-semibold tabular-nums mt-2">{servers.length}</div>
+          <div className="bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-sky-100 rounded-xl flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">平均 CPU</div>
+                <div className="text-xl font-bold text-gray-800">{avgCpu}%</div>
+              </div>
+            </div>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-            <div className="text-sm text-zinc-500">更新频率</div>
-            <div className="text-5xl font-semibold tabular-nums mt-2">15s</div>
+          <div className="bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">更新频率</div>
+                <div className="text-xl font-bold text-gray-800">15s</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold">服务器列表</h2>
-            <div className="text-xs px-3 py-1 bg-zinc-800 rounded-full">每15秒自动刷新</div>
+        {/* Server table */}
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-800">服务器列表</h2>
+            <div className="text-xs px-2 sm:px-3 py-1.5 bg-sky-50 text-sky-600 rounded-full font-medium shrink-0">15s 刷新</div>
           </div>
           <ServersTable data={servers} isLoading={isLoading} />
         </div>
 
-        <div className="text-center text-xs text-zinc-500 pt-8">
-          Vigil + TanStack + Cloudflare Pages · 全球边缘加速 · 完全免费
+        <div className="text-center text-xs text-gray-400 pt-4 pb-2">
+          Vigil · Cloudflare · 一路白嫖
         </div>
       </div>
     </div>
