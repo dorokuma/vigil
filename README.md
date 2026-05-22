@@ -90,7 +90,7 @@ systemctl enable --now vigil-agent
 Or use the one-liner install script:
 
 ```bash
-bash deploy/install.sh amd64 my-server-01 https://your-collector:9901
+bash deploy/install.sh amid64 my-server-01 https://your-collector:9901
 ```
 
 ### 4. Set up the Collector
@@ -144,7 +144,7 @@ See `bot/` for the full source.
 
 ## Security & HTTPS 🔒
 
-**Token Authentication** (strongly recommended)
+**Token Authentication** (strongly recommended for the collector)
 - Set the same `token` in agent config.json and collector
 - Collector rejects requests with wrong/missing token (returns 401)
 - Works over both HTTP and HTTPS
@@ -223,25 +223,34 @@ See `deploy/docker-compose.yml` for the full example (includes healthcheck, volu
    bash deploy/setup-cloudflare-tunnel.sh
    ```
 
-### How to Enable Persistent Alert History (KV)
+### Recommended Security: Cloudflare Access (Zero Trust)
 
-By default, alert history uses Cloudflare KV for persistence (recommended for production).
+**强烈推荐**使用 Cloudflare Access 保护整个 Dashboard（免费、简单、安全）。
 
-**Steps to enable:**
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com) → Workers & Pages → KV
-2. Click "Create a namespace" → Name it `vigil-alerts`
-3. Copy the **ID** of the new namespace
-4. Edit `dash/wrangler.toml` and replace the placeholder:
-   ```toml
-   [kv_namespaces]
-   ALERTS = { binding = "ALERTS_KV", id = "your-kv-namespace-id-here" }
-   ```
-5. Redeploy the dashboard:
-   ```bash
-   cd dash && npm run build && npx wrangler pages deploy dist
-   ```
+**原理**：在 Cloudflare 边缘层拦截所有访问，只有允许的邮箱才能登录。
 
-Now alert history will be permanently stored in Cloudflare KV (free tier is more than enough).
+**设置步骤（5 分钟）：**
+
+1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)
+2. 进入你的 Pages 项目 → **Access**（左侧菜单）
+3. 点击 **Applications** → **Add an application** → **Self-hosted**
+4. 填写：
+   - **Application name**: `vigil-dashboard`
+   - **Domain**: 选择你的 Dashboard 域名
+5. **Identity providers** 选择 **Google**（或 Microsoft / GitHub）
+6. **Policies** → Add a policy:
+   - **Policy name**: `Allow specific email`
+   - **Action**: Allow
+   - **Include** → Email → 输入你的邮箱（例如 `yourname@gmail.com`）
+7. 保存并部署
+
+完成！以后只有你指定的邮箱才能访问 Dashboard，其他人会看到 Access Denied。
+
+**优点**：
+- 完全免费（基础功能）
+- 不需要改代码
+- 即使域名公开也安全
+- 支持 Google / Microsoft / GitHub 登录
 
 ## Metrics
 
