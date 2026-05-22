@@ -20,6 +20,7 @@ class VigilHandler(BaseHTTPRequestHandler):
     alert_callback = None
     expected_token = None
     pinger = None  # Pinger 实例（同步接口）
+    local_hostname = None  # 本机标识，设为 None 时不启用
 
     # ── 路由 ──────────────────────────────────────────────
 
@@ -160,7 +161,7 @@ class VigilHandler(BaseHTTPRequestHandler):
                 item = {
                     "hostname": hostname,
                     "online": not is_offline,
-                    "rtt": "本机" if hostname == "beijing" else (round(p["rtt"], 1) if (p and p.get("last_ok")) else None),
+                    "rtt": "本机" if (VigilHandler.local_hostname and hostname == VigilHandler.local_hostname) else (round(p["rtt"], 1) if (p and p.get("last_ok")) else None),
                     "loss_pct": round(p["loss_pct"], 1) if (p and p.get("last_ok")) else None,
                     "last_ping": p.get("updated_at", 0) if p else 0,
                     "cpu_percent": round(
@@ -189,7 +190,7 @@ class VigilHandler(BaseHTTPRequestHandler):
 
             if ping_data:
                 last_ok = bool(ping_data.get("last_ok", 0))
-                if hostname == "beijing":
+                if VigilHandler.local_hostname and hostname == VigilHandler.local_hostname:
                     rtt_val = "本机"
                 elif last_ok and ping_data.get("rtt", 0) > 0:
                     rtt_val = round(ping_data["rtt"], 1)
@@ -275,13 +276,15 @@ class VigilHandler(BaseHTTPRequestHandler):
 
 
 def start_vigil_server(host, port, storage, alert_engine, alert_callback,
-                       token=None, certfile=None, keyfile=None, pinger=None):
+                       token=None, certfile=None, keyfile=None, pinger=None,
+                       local_hostname=None):
     """启动 Vigil HTTP 服务"""
     VigilHandler.storage = storage
     VigilHandler.alert_engine = alert_engine
     VigilHandler.alert_callback = alert_callback
     VigilHandler.expected_token = token
     VigilHandler.pinger = pinger
+    VigilHandler.local_hostname = local_hostname
 
     server = HTTPServer((host, port), VigilHandler)
 

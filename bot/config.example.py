@@ -36,5 +36,9 @@ ALERT_DISK = 90.0      # 磁盘使用率超过此值告警
 # ==== Agent 离线检测 ====
 OFFLINE_CHECK_INTERVAL = 60  # 每 60 秒检查一次
 
+# ==== 本机标识 ====
+# 在 Dashboard 上本机显示为"本机"而不是延迟数字
+# LOCAL_HOSTNAME = "my-server"
+
 # ==== 日志 ====
 LOG_LEVEL = "INFO"
