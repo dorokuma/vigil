@@ -1,14 +1,12 @@
 <div align="center">
   <h1>🔭 Vigil</h1>
-  <p><em>Lightweight server monitoring agent with active push mode</em></p>
+  <p><em>Modern server monitoring with Go agent + Cloudflare stack</em></p>
   <p>
     <a href="#features">Features</a> •
     <a href="#architecture">Architecture</a> •
     <a href="#quick-start">Quick Start</a> •
-    <a href="#security">Security & HTTPS</a> •
-    <a href="#docker">Docker Deployment</a> •
-    <a href="#full-deploy">Full Deployment Guide</a> •
-    <a href="#metrics">Metrics</a> •
+    <a href="#security">Security</a> •
+    <a href="#full-deploy">Deployment</a> •
     <a href="#license">License</a>
   </p>
   <p>
@@ -18,77 +16,40 @@
 
 ---
 
-**Vigil** is a lightweight server monitoring system. Each server runs a tiny Go agent that actively reads `/proc/` metrics and pushes them via HTTP/HTTPS to a central collector (no inbound ports needed on monitored servers).
+**Vigil** is a modern server monitoring system. A tiny Go agent runs on each server, actively collects `/proc/` metrics, and pushes them via HTTPS to a central collector. The system includes a beautiful React + TanStack dashboard deployed on Cloudflare Pages, real-time alerts with history persistence (KV), CSV export, and optional protection via Cloudflare Access (email whitelist).
 
 ## Features
 
-- **Single binary agent** — Go compiled, ~5MB RAM, zero dependencies
-- **Dual architecture** — Pre-built `linux/amd64` + `linux/arm64`
-- **Active push mode** — No open ports required on target servers
-- **Systemd managed** — Auto-restart + journalctl logs
-- **Minimal collector** — Python 3 + SQLite (no external DB)
-- **Token auth + HTTPS** — Built-in security
-- **Threshold + Offline alerts** — CPU/Memory/Disk + automatic offline detection
-- **Modern Dashboard** — React + TanStack + Cloudflare Pages (free tier)
+- **Tiny Go Agent** — ~5MB RAM, zero dependencies, active push
+- **Python Collector** — SQLite + threshold + offline detection
+- **Modern Dashboard** — React 19 + TanStack Table + Cloudflare Pages
+- **Alert History** — Persistent via Cloudflare KV
+- **One-click Deploy** — Systemd + Docker + Cloudflare
+- **Security** — Token auth + Cloudflare Access (Zero Trust)
 
 ## Architecture
 
 ```
-Server → Agent (Go) → HTTPS POST → Collector (Python + SQLite) → Alerts → Telegram + Web Dashboard
+Server → Go Agent → HTTPS → Python Collector → SQLite → Alerts → Telegram + Web Dashboard (Cloudflare)
 ```
 
 ## Quick Start
 
-### 1. Build the Agent
-
 ```bash
+# 1. Build Agent
 cd agent && go build -o vigil-agent ./...
-```
 
-### 2. Configure Agent
-
-Create `/etc/vigil/config.json`:
-
-```json
-{
-  "server_url": "https://your-collector:9901",
-  "interval": 30,
-  "hostname": "my-server-01",
-  "token": "super-secret-123"
-}
-```
-
-### 3. Install as systemd service
-
-```bash
-bash deploy/install.sh amd64 my-server-01 https://your-collector:9901
-```
-
-### 4. Run the Collector
-
-```bash
+# 2. Run Collector
 cp bot/config.example.py bot/config.py
-# edit config.py
 python bot/main.py
+
+# 3. Deploy Dashboard
+cd dash && npm run build && npx wrangler pages deploy dist
 ```
 
-## Docker Deployment
+## Full Deployment
 
-```bash
-cd deploy
-./generate-selfsigned-cert.sh your-domain.com
-# edit docker-compose.yml
-docker compose up -d
-```
-
-## Full Deployment (Recommended)
-
-1. Deploy Dashboard → `cd dash && npm run build && npx wrangler pages deploy dist`
-2. Run Bot → `python bot/main.py` (with `CF_ALERT_URL`)
-3. Deploy Agents → `bash deploy/install.sh`
-4. (Optional) Protect with Cloudflare Access (email whitelist)
-
-See detailed guide in README.
+See detailed guide below.
 
 ## License
 
