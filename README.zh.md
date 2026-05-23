@@ -340,10 +340,6 @@ async def push_alert(alert):
     await application.bot.send_message(chat_id=你的聊天ID, text=text)
 ```
 
-## 为什么用 Vigil？
-
-**相比 LLM-Wiki 或传统 RAG**——这是一个真正服务于真实服务器的监控系统。没有"增量知识编译"，没有"图谱检索"。只是一个读取 `/proc/` 并推送 JSON 的 Go 二进制。
-
 ## 许可证
 
 GPL v3
