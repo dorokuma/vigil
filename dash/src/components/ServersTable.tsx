@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -6,110 +7,138 @@ import {
   flexRender,
   createColumnHelper,
   type SortingState,
-} from '@tanstack/react-table';
-import { useState } from 'react';
-
-import type { EnrichedServer } from '../types';
+} from '@tanstack/react-table'
+import { Search, Download, ChevronUp, ChevronDown } from 'lucide-react'
+import { StatusDot } from './StatusDot'
+import type { EnrichedServer } from '../types'
 
 interface ServersTableProps {
-  data: EnrichedServer[];
-  isLoading: boolean;
+  data: EnrichedServer[]
+  isLoading: boolean
 }
 
-const columnHelper = createColumnHelper<EnrichedServer>();
+/* ── 颜色辅助函数 ── */
+
+function cpuBarColor(value: number): string {
+  if (value >= 80) return 'bg-rose-500 dark:bg-rose-400'
+  if (value >= 50) return 'bg-amber-500 dark:bg-amber-400'
+  return 'bg-emerald-500 dark:bg-emerald-400'
+}
+
+function latencyColor(value: number | string | null): string {
+  if (value === null || value === 0 || typeof value === 'string' || !value) return 'text-zinc-400 dark:text-zinc-600'
+  if (value >= 150) return 'text-rose-600 dark:text-rose-400'
+  if (value >= 50) return 'text-amber-600 dark:text-amber-400'
+  return 'text-emerald-600 dark:text-emerald-400'
+}
+
+/* ── 列定义 ── */
+
+const columnHelper = createColumnHelper<EnrichedServer>()
 
 export function ServersTable({ data, isLoading }: ServersTableProps) {
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState('');
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [globalFilter, setGlobalFilter] = useState('')
 
-  const columns = [
-    columnHelper.accessor('name', {
-      header: '服务器',
-      cell: info => (
-        <div className="font-medium text-gray-800 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-          <span>{info.row.original.location}</span>
-        </div>
-      ),
-    }),
-    columnHelper.accessor('online', {
-      header: '状态',
-      cell: info => (
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-          info.getValue() 
-            ? 'bg-emerald-50 text-emerald-600' 
-            : 'bg-red-50 text-red-600'
-        }`}>
-          <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-            info.getValue() ? 'bg-emerald-400' : 'bg-red-400'
-          }`} />
-          {info.getValue() ? '正常' : '离线'}
-        </span>
-      ),
-    }),
-    columnHelper.accessor('cpu', {
-      header: 'CPU',
-      cell: info => (
-        <div className="flex items-center gap-2">
-          <div className="w-11 sm:w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
-            <div 
-              className="h-full bg-gradient-to-r from-sky-400 to-blue-500 rounded-full transition-all" 
-              style={{ width: `${Math.min(info.getValue(), 100)}%` }} 
-            />
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('online', {
+        header: '',
+        enableSorting: true,
+        cell: (info) => (
+          <div className="flex justify-center">
+            <StatusDot online={info.getValue()} />
           </div>
-          <span className="text-xs tabular-nums text-gray-500 w-8">{info.getValue()}%</span>
-        </div>
-      ),
-    }),
-    columnHelper.accessor('memory', {
-      header: '内存',
-      cell: info => (
-        <div className="flex items-center gap-2">
-          <div className="w-11 sm:w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
-            <div 
-              className="h-full bg-gradient-to-r from-teal-400 to-emerald-500 rounded-full transition-all" 
-              style={{ width: `${Math.min(info.getValue(), 100)}%` }} 
-            />
-          </div>
-          <span className="text-xs tabular-nums text-gray-500 w-8">{info.getValue()}%</span>
-        </div>
-      ),
-    }),
-    columnHelper.accessor('disk', {
-      header: '磁盘',
-      cell: info => (
-        <div className="flex items-center gap-2">
-          <div className="w-11 sm:w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
-            <div 
-              className={`h-full rounded-full transition-all ${
-                info.getValue() > 90 ? 'bg-red-400' : info.getValue() > 70 ? 'bg-amber-400' : 'bg-violet-400'
-              }`}
-              style={{ width: `${Math.min(info.getValue(), 100)}%` }} 
-            />
-          </div>
-          <span className="text-xs tabular-nums text-gray-500 w-8">{info.getValue()}%</span>
-        </div>
-      ),
-    }),
-    columnHelper.accessor('latency', {
-      header: () => <span className="min-w-[5rem] block whitespace-nowrap">延迟</span>,
-      cell: info => {
-        const v = info.getValue();
-        if (typeof v === 'string') {
-          return <span className="text-xs text-gray-400 font-medium whitespace-nowrap">{v}</span>;
-        }
-        const num = v as number;
-        const color = num < 50 ? 'text-emerald-500' : num < 150 ? 'text-amber-500' : 'text-red-500';
-        return <span className={`text-xs tabular-nums font-medium whitespace-nowrap ${color}`}>{num}ms</span>;
-      },
-    }),
-    columnHelper.accessor('uptime', {
-      header: '运行',
-      cell: info => (
-        <span className="text-xs text-gray-400 whitespace-nowrap">{info.getValue()}</span>
-      ),
-    }),
-  ];
+        ),
+      }),
+      columnHelper.accessor('name', {
+        header: '服务器',
+        cell: (info) => (
+          <span className="font-medium text-zinc-900 dark:text-zinc-100">
+            {info.getValue()}
+          </span>
+        ),
+      }),
+      columnHelper.accessor('location', {
+        header: '地区',
+        cell: (info) => (
+          <span className="inline-flex items-center px-2 py-0.5 text-xs rounded-md
+                         bg-zinc-100 text-zinc-600
+                         dark:bg-zinc-800 dark:text-zinc-400">
+            {info.getValue()}
+          </span>
+        ),
+      }),
+      columnHelper.accessor('cpu', {
+        header: 'CPU',
+        cell: (info) => {
+          const val = info.getValue()
+          return (
+            <div className="flex items-center gap-2.5 min-w-[100px]">
+              <div className="flex-1 h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${cpuBarColor(val)}`}
+                  style={{ width: `${Math.min(val, 100)}%` }}
+                />
+              </div>
+              <span className="text-xs tabular-nums w-8 text-right text-zinc-600 dark:text-zinc-400">
+                {val}%
+              </span>
+            </div>
+          )
+        },
+      }),
+      columnHelper.accessor('memory', {
+        header: '内存',
+        cell: (info) => {
+          const val = info.getValue()
+          return (
+            <div className="flex items-center gap-2.5 min-w-[100px]">
+              <div className="flex-1 h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${cpuBarColor(val)}`}
+                  style={{ width: `${Math.min(val, 100)}%` }}
+                />
+              </div>
+              <span className="text-xs tabular-nums w-8 text-right text-zinc-600 dark:text-zinc-400">
+                {val}%
+              </span>
+            </div>
+          )
+        },
+      }),
+      columnHelper.accessor('latency', {
+        header: '延迟',
+        cell: (info) => {
+          const val = info.getValue()
+          const loss = info.row.original.packetLoss
+          const numericLat = typeof val === 'number' ? val : 0
+          return (
+            <span className={`tabular-nums text-sm ${latencyColor(val)}`}>
+              {numericLat > 0 ? `${val}ms` : '—'}
+              {loss > 0 && (
+                <span className="text-rose-500 dark:text-rose-400 ml-1 text-xs">
+                  / {loss}%丢包
+                </span>
+              )}
+            </span>
+          )
+        },
+      }),
+      columnHelper.accessor('uptime', {
+        header: '运行时间',
+        cell: (info) => {
+          const val = info.getValue()
+          return (
+            <span className="text-sm text-zinc-500 dark:text-zinc-400 tabular-nums">
+              {val || '—'}
+            </span>
+          )
+        },
+      }),
+    ],
+    [],
+  )
 
   const table = useReactTable({
     data,
@@ -120,96 +149,146 @@ export function ServersTable({ data, isLoading }: ServersTableProps) {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-  });
+  })
 
   const exportToCSV = () => {
-    const headers = ['服务器', '状态', 'CPU%', '内存%', '延迟(ms)', '运行时间'];
-    const rows = data.map(s => [
+    const headers = ['服务器', '地区', '状态', 'CPU%', '内存%', '延迟(ms)', '丢包%', '运行时间']
+    const rows = data.map((s) => [
       s.name,
+      s.location,
       s.online ? '在线' : '离线',
       s.cpu,
       s.memory,
       s.latency,
-      s.uptime
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.href = url;
-    link.download = `vigil-servers-${new Date().toISOString().slice(0,10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+      s.packetLoss,
+      s.uptime,
+    ])
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `vigil-servers-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }
 
   if (isLoading) {
-    return <div className="p-8 text-center text-gray-400">加载中...</div>;
+    return (
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/60 dark:border-zinc-800/60 p-6">
+        <div className="space-y-4 animate-pulse">
+          <div className="h-9 bg-zinc-100 dark:bg-zinc-800 rounded-lg w-full" />
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-12 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg w-full" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <input
-          type="text"
-          placeholder="搜索服务器..."
-          value={globalFilter}
-          onChange={e => setGlobalFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-sky-300 focus:ring-2 focus:ring-sky-100 outline-none w-full sm:w-72 text-sm text-gray-700 placeholder-gray-400 transition-all"
-        />
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          <div className="text-xs text-gray-400 font-medium shrink-0">
-            {table.getFilteredRowModel().rows.length} 台
-          </div>
+    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/60 dark:border-zinc-800/60 shadow-sm dark:shadow-none animate-fade-in">
+      {/* 工具栏 */}
+      <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="relative flex-1 max-w-xs">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500"
+          />
+          <input
+            type="text"
+            placeholder="搜索服务器..."
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="w-full pl-9 pr-3 py-1.5 text-sm rounded-lg
+                       bg-zinc-50 border border-zinc-200 text-zinc-900
+                       dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100
+                       placeholder:text-zinc-400 dark:placeholder:text-zinc-500
+                       focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500
+                       dark:focus:border-cyan-400 transition-all"
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-zinc-400 dark:text-zinc-500 tabular-nums">
+            {table.getFilteredRowModel().rows.length} 台服务器
+          </span>
           <button
             onClick={exportToCSV}
-            className="px-4 py-1.5 text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-gray-600 flex items-center gap-1.5 transition-all shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg
+                       text-zinc-600 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200
+                       dark:text-zinc-400 dark:hover:text-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700
+                       transition-colors"
           >
-            📥 CSV
+            <Download size={13} />
+            导出 CSV
           </button>
         </div>
       </div>
 
-      <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-none sm:rounded-xl border-0 sm:border border-gray-100">
-        <div className="min-w-[600px] sm:min-w-0">
-          <table className="w-full text-sm">
-            <thead>
-              {table.getHeaderGroups().map(headerGroup => (
-                <tr key={headerGroup.id} className="border-b border-gray-50">
-                  {headerGroup.headers.map(header => (
-                    <th
-                      key={header.id}
-                      className="px-4 sm:px-6 py-3.5 text-left font-medium text-gray-400 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-gray-600 transition-colors whitespace-nowrap"
-                      onClick={header.column.getToggleSortingHandler()}
-                    >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {{
-                        asc: ' ↑',
-                        desc: ' ↓',
-                      }[header.column.getIsSorted() as string] ?? null}
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {table.getRowModel().rows.map(row => (
-                <tr key={row.id} className="hover:bg-sky-50/50 transition-colors">
-                  {row.getVisibleCells().map(cell => (
-                    <td key={cell.id} className="px-4 sm:px-6 py-3 sm:py-4 text-gray-600">
+      {/* 表格 */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <th
+                    key={header.id}
+                    className="px-5 py-3.5 text-left text-xs font-medium
+                               text-zinc-500 dark:text-zinc-400
+                               cursor-pointer select-none whitespace-nowrap
+                               hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+                    onClick={header.column.getToggleSortingHandler()}
+                  >
+                    <div className="flex items-center gap-1">
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
+                      <span className="inline-flex flex-col leading-none text-[10px] text-zinc-300 dark:text-zinc-600">
+                        {header.column.getIsSorted() === 'asc' ? (
+                          <ChevronUp size={12} className="text-cyan-500 dark:text-cyan-400" />
+                        ) : header.column.getIsSorted() === 'desc' ? (
+                          <ChevronDown size={12} className="text-cyan-500 dark:text-cyan-400" />
+                        ) : (
+                          <>
+                            <ChevronUp size={8} />
+                            <ChevronDown size={8} className="-mt-0.5" />
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {table.getRowModel().rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className="px-5 py-12 text-center text-sm text-zinc-400 dark:text-zinc-500"
+                >
+                  没有匹配的服务器
+                </td>
+              </tr>
+            ) : (
+              table.getRowModel().rows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className="px-5 py-3.5">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
-  );
+  )
 }

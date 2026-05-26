@@ -1,109 +1,93 @@
-import { useQuery } from '@tanstack/react-query';
-import { ServersTable } from '../components/ServersTable';
-
-interface Server {
-  name: string;
-  location: string;
-  online: boolean;
-  latency: number | string | null;
-  packetLoss: number;
-  uptime: string;
-  cpu: number;
-  memory: number;
-  disk: number;
-}
+import { useQuery } from '@tanstack/react-query'
+import { Server, Cpu, HardDrive, Gauge } from 'lucide-react'
+import { StatCard } from '../components/StatCard'
+import { ServersTable } from '../components/ServersTable'
+import type { EnrichedServer } from '../types'
 
 export default function Dashboard() {
-  const { data: servers = [], isLoading } = useQuery<Server[]>({
+  const { data: servers = [], isLoading } = useQuery<EnrichedServer[]>({
     queryKey: ['servers'],
     queryFn: async () => {
-      const res = await fetch('/api/servers');
-      if (!res.ok) throw new Error('Failed to fetch');
-      return res.json();
+      const res = await fetch('/api/servers')
+      if (!res.ok) throw new Error('Failed to fetch')
+      return res.json()
     },
-    refetchInterval: 15000,
-  });
+    refetchInterval: 15_000,
+  })
 
-  const onlineCount = servers.filter(s => s.online).length;
-  const avgCpu = servers.length 
-    ? Math.round(servers.reduce((sum, s) => sum + s.cpu, 0) / servers.length) 
-    : 0;
-  const numericLatencies = servers
-    .map(s => s.latency)
-    .filter((v): v is number => typeof v === 'number' && !isNaN(v));
-  const avgLatency = numericLatencies.length
-    ? Math.round(numericLatencies.reduce((a, b) => a + b, 0) / numericLatencies.length)
-    : null;
+  const onlineCount = servers.filter((s) => s.online).length
+  const totalCount = servers.length
+  const avgCpu = totalCount
+    ? Math.round(servers.reduce((sum, s) => sum + s.cpu, 0) / totalCount)
+    : 0
+  const avgMem = totalCount
+    ? Math.round(servers.reduce((sum, s) => sum + s.memory, 0) / totalCount)
+    : 0
+  const avgLat = totalCount
+    ? Math.round(
+        servers.reduce((sum, s) => {
+          const lat = typeof s.latency === 'number' ? s.latency : 0
+          return sum + lat
+        }, 0) / totalCount,
+      )
+    : 0
 
   return (
-    <div className="p-4 sm:p-8">
-      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
-        {/* Header: just logo */}
-        <div className="flex items-center gap-4">
-          <img src="/favicon.svg" alt="Vigil" className="w-10 h-10 sm:w-12 sm:h-12" />
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">Vigil</h1>
-        </div>
+    <div className="space-y-6">
+      {/* 页面标题 */}
+      <div className="animate-fade-in">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+          服务器监控
+        </h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+          实时状态 · 每15秒自动刷新 · Cloudflare 全球加速
+        </p>
+      </div>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-          <div className="bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
-                <svg className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">正常节点</div>
-                <div className="text-xl font-bold text-gray-800">{onlineCount} / {servers.length}</div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-sky-100 rounded-xl flex items-center justify-center shrink-0">
-                <svg className="w-5 h-5 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">平均 CPU</div>
-                <div className="text-xl font-bold text-gray-800">{avgCpu}%</div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center shrink-0">
-                <svg className="w-5 h-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">平均延迟</div>
-                <div className="text-xl font-bold text-gray-800">{avgLatency === null ? '-' : `${avgLatency}ms`}</div>
-              </div>
-            </div>
-          </div>
+      {/* 统计卡片 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="animate-fade-in animate-fade-in-d1">
+          <StatCard
+            icon={Server}
+            label="在线服务器"
+            value={`${onlineCount} / ${totalCount}`}
+            subtext={totalCount > 0 ? `${Math.round((onlineCount / totalCount) * 100)}% 在线率` : '暂无数据'}
+            accent="emerald"
+          />
         </div>
-
-        {/* Server table */}
-        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
-            <h2 className="text-base sm:text-lg font-semibold text-gray-800">服务器列表</h2>
-            <div className="text-xs px-2 sm:px-3 py-1.5 bg-sky-50 text-sky-600 rounded-full font-medium shrink-0">15s 刷新</div>
-          </div>
-          <ServersTable data={servers} isLoading={isLoading} />
+        <div className="animate-fade-in animate-fade-in-d2">
+          <StatCard
+            icon={Cpu}
+            label="平均 CPU"
+            value={`${avgCpu}%`}
+            barValue={avgCpu}
+            subtext="所有服务器平均"
+            accent="cyan"
+          />
         </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-center gap-2 text-xs text-gray-400 pt-4 pb-2">
-          <span className="inline-block w-1 h-1 rounded-full bg-gray-300" />
-          Vigil
-          <span className="inline-block w-1 h-1 rounded-full bg-gray-300" />
-          Cloudflare 白嫖计划
+        <div className="animate-fade-in animate-fade-in-d3">
+          <StatCard
+            icon={HardDrive}
+            label="平均内存"
+            value={`${avgMem}%`}
+            barValue={avgMem}
+            subtext="所有服务器平均"
+            accent="violet"
+          />
+        </div>
+        <div className="animate-fade-in animate-fade-in-d4">
+          <StatCard
+            icon={Gauge}
+            label="平均延迟"
+            value={avgLat > 0 ? `${avgLat}ms` : '—'}
+            subtext="全球平均响应"
+            accent="amber"
+          />
         </div>
       </div>
+
+      {/* 服务器列表 */}
+      <ServersTable data={servers} isLoading={isLoading} />
     </div>
-  );
+  )
 }
