@@ -60,7 +60,7 @@ export function StatCard({ icon: Icon, label, value, subtext, barValue, accent }
           <div className="h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${s.bar}`}
-              style={{ width: `${Math.min(barValue, 100)}%` }}
+              style={{ width: `${Math.max(0, Math.min(barValue, 100))}%` }}
             />
           </div>
         </div>

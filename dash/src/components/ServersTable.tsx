@@ -151,17 +151,25 @@ export function ServersTable({ data, isLoading }: ServersTableProps) {
     getFilteredRowModel: getFilteredRowModel(),
   })
 
+  const csvEscape = (val: unknown): string => {
+    const str = String(val ?? '')
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`
+    }
+    return str
+  }
+
   const exportToCSV = () => {
     const headers = ['服务器', '地区', '状态', 'CPU%', '内存%', '延迟(ms)', '丢包%', '运行时间']
     const rows = data.map((s) => [
-      s.name,
-      s.location,
-      s.online ? '在线' : '离线',
-      s.cpu,
-      s.memory,
-      s.latency,
-      s.packetLoss,
-      s.uptime,
+      csvEscape(s.name),
+      csvEscape(s.location),
+      csvEscape(s.online ? '在线' : '离线'),
+      csvEscape(s.cpu),
+      csvEscape(s.memory),
+      csvEscape(s.latency),
+      csvEscape(s.packetLoss),
+      csvEscape(s.uptime),
     ])
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })

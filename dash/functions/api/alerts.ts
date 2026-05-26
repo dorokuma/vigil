@@ -64,5 +64,12 @@ export async function onRequest(context: { request: Request; env: { ALERTS_KV?: 
     });
   }
 
+  if (request.method === 'DELETE' && url.pathname === '/api/alerts') {
+    await saveAlerts(env, []);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   return new Response('Not Found', { status: 404 });
 }

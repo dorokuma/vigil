@@ -42,7 +42,7 @@ export default function Alerts() {
   }
 
   const clearHistory = async () => {
-    localStorage.removeItem('vigil-alerts')
+    await fetch('/api/alerts', { method: 'DELETE' })
     refetch()
   }
 
