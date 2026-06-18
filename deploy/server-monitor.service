@@ -1,0 +1,16 @@
+[Unit]
+Description=Server Monitor Engine
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/server-monitor
+Restart=always
+RestartSec=5
+User=root
+Group=root
+
+# ICMP raw socket 权限（编译时已 setcap，运行时不需要额外权限）
+
+[Install]
+WantedBy=multi-user.target

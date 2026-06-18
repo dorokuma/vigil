@@ -1,0 +1,16 @@
+[Unit]
+Description=Server Monitor Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/root/server-monitor/bot/venv/bin/python3 /root/server-monitor/bot/bot.py
+Restart=always
+RestartSec=5
+User=root
+Group=root
+WorkingDirectory=/root/server-monitor/bot
+EnvironmentFile=/root/secrets/server-bot.env
+
+[Install]
+WantedBy=multi-user.target

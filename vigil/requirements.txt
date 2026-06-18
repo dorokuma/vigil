@@ -1,0 +1,8 @@
+# Vigil Bot - Python 依赖
+# 核心功能只需要标准库（零外部依赖）
+#
+# 如果要用 Telegram 集成，需要：
+# python-telegram-bot>=21.0
+# httpx>=0.27.0
+#
+# Telegram Bot 集成示例见 README.md
