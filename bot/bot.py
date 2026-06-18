@@ -7,7 +7,7 @@ import os
 import shlex
 
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -59,7 +59,7 @@ def load_alert_history():
 def save_alert_record(server: str, reason: str, rtt: float = 0, loss: float = 0):
     history = load_alert_history()
     history.append({
-        "time": datetime.now().isoformat(),
+        "time": datetime.now(timezone.utc).isoformat(),
         "server": server,
         "reason": reason,
         "rtt": rtt,

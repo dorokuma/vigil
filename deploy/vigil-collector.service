@@ -1,22 +1,13 @@
 [Unit]
-Description=Vigil Collector (Python receiver with HTTPS + Token)
+Description=Vigil Collector - Server Monitor (v2)
 After=network.target
 
 [Service]
 Type=simple
-# User=www-data  # uncomment and set your user if needed
-# Group=www-data
-WorkingDirectory=/opt/vigil
-Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 /opt/vigil/main.py
+ExecStart=/usr/bin/python3 /root/server-monitor/vigil/main.py
+WorkingDirectory=/root/server-monitor/vigil
 Restart=always
 RestartSec=5
-
-# Security hardening
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/opt/vigil
 
 [Install]
 WantedBy=multi-user.target

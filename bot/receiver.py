@@ -36,7 +36,7 @@ class VigilHandler(BaseHTTPRequestHandler):
             handlers[path] = lambda: self._handle_api_server(path[12:])
         # /api/ping/<name>
         elif path.startswith("/api/ping/"):
-            handlers[path] = lambda: self._handle_api_ping(path[11:])
+            handlers[path] = lambda: self._handle_api_ping(path[10:])
 
         handler = handlers.get(path, self._handle_404)
         handler()
